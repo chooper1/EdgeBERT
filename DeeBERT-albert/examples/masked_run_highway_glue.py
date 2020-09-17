@@ -265,9 +265,9 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                print ("prune amount is: ", prune_amount)
 
         for step, batch in enumerate(epoch_iterator):
-            if steps_trained_in_current_epoch > 0:
-                steps_trained_in_current_epoch -= 1
-                continue
+#             if steps_trained_in_current_epoch > 0:
+#                 steps_trained_in_current_epoch -= 1
+#                 continue
 
             model.train()
             batch = tuple(t.to(args.device) for t in batch)
