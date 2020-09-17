@@ -20,11 +20,9 @@ then
   MODEL_NAME=${MODEL_NAME}-v2
 fi
 
-ENTROPIES="0"
 THRESHOLDS="1"
 
 for FINAL_THRESH in $THRESHOLDS; do
-for ENTROPY in $ENTROPIES; do
   echo $FINAL_THRESH
   echo $ENTROPY
   python ../examples/masked_run_highway_glue.py \
@@ -51,8 +49,5 @@ for ENTROPY in $ENTROPIES; do
     --mask_scores_learning_rate 1e-2 \
     --initial_threshold 1 --final_threshold ${FINAL_THRESH} \
     --initial_warmup 1 --final_warmup 2 \
-    --pruning_method topK --mask_init constant --mask_scale 0. \
-    --early_exit_entropy $ENTROPY \
-    --eval_highway
-done
+    --pruning_method topK --mask_init constant --mask_scale 0. 
 done
