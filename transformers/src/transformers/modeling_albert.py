@@ -23,8 +23,8 @@ import torch.nn as nn
 from torch.nn import CrossEntropyLoss, MSELoss
 
 from transformers.configuration_albert import AlbertConfig
-from transformers.modeling_bert import ACT2FN, BertEmbeddings, BertSelfAttention, prune_linear_layer
-from transformers.modeling_utils import PreTrainedModel
+from transformers.modeling_bert import ACT2FN, BertEmbeddings, BertSelfAttention
+from transformers.modeling_utils import PreTrainedModel, prune_linear_layer
 
 from .file_utils import add_start_docstrings, add_start_docstrings_to_callable
 
@@ -449,6 +449,7 @@ class AlbertModel(AlbertPreTrainedModel):
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
+        self.embeddings.requires_grad_(requires_grad=False)
         self.encoder = AlbertTransformer(config)
         self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_activation = nn.Tanh()

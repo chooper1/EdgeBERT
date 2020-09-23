@@ -103,18 +103,12 @@ class AlbertTransformer(nn.Module):
             # Index of the hidden group
             group_idx = int(i / (self.config.num_hidden_layers / self.config.num_hidden_groups))
 
-            #print(i)
-            #print(hidden_states)
-
             layer_group_output = self.albert_layer_groups[group_idx](
                 hidden_states,
                 attention_mask,
                 head_mask[group_idx * layers_per_group : (group_idx + 1) * layers_per_group],
             )
             hidden_states = layer_group_output[0]
-            #print(self.albert_layer_groups)
-            #print(i)
-            #print(hidden_states)
 
            #stopped here
             if self.output_attentions:
@@ -130,14 +124,9 @@ class AlbertTransformer(nn.Module):
                 current_outputs = current_outputs + (all_hidden_states,)
             if self.output_attentions:
                 current_outputs = current_outputs + (all_attentions,)
-            #print(len(current_outputs))
-            #print(len(current_outputs[0]))
 
             #problem:: returns 8*128=1024 instead of 8 cells
             highway_exit = self.highway[group_idx](current_outputs) #changed from self.highway[i](current_outputs)
-            #print(highway_exit[0])
-            #print(len(highway_exit[0]))
-            #print(len(highway_exit[0][0]))
             #highway_exit = self.highway[group_idx](current_outputs)
 
             #added this section
@@ -181,6 +170,7 @@ class AlbertModel(AlbertPreTrainedModel):
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
+        self.embeddings.requires_grad_(requires_grad=False)
         self.encoder = AlbertTransformer(config)
         self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_activation = nn.Tanh()
@@ -327,18 +317,22 @@ class AlbertHighway(nn.Module):
     def __init__(self, config):
         #super().__init__(config) ###
         super(AlbertHighway, self).__init__()
-        #self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
-        #self.pooler_activation = nn.Tanh()
+        self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
+        self.pooler_activation = nn.Tanh()
         ##
-        self.pooler = BertPooler(config)
+        # self.pooler = BertPooler(config)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
     def forward(self, encoder_outputs):
         # Pooler
         pooler_input = encoder_outputs[0]
-        pooler_output = self.pooler(pooler_input)
+        # pooler_output = self.pooler(pooler_input)
         # "return" pooler_output
+
+        #adding here:
+        pooler_input = self.pooler(pooler_input[:,0])
+        pooler_output = self.pooler_activation(pooler_input)
 
         # BertModel
         bmodel_output = (pooler_input, pooler_output) + encoder_outputs[1:]
@@ -465,8 +459,6 @@ class AlbertForSequenceClassification(AlbertPreTrainedModel):
                     highway_loss = loss_fct(highway_logits.view(-1), labels.view(-1))
                 else:
                     loss_fct = CrossEntropyLoss()
-                    #print(highway_logits.view(-1, self.num_labels))
-                    #print(labels.view(-1))
                     highway_loss = loss_fct(highway_logits.view(-1, self.num_labels), labels.view(-1))
                 highway_losses.append(highway_loss)
 

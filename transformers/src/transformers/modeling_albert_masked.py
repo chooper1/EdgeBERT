@@ -25,8 +25,8 @@ from torch.nn import CrossEntropyLoss, MSELoss
 #from emmental import MaskedBertConfig
 from .configuration_albert_masked import MaskedAlbertConfig
 from .masked_nn import MaskedLinear
-from transformers.configuration_albert import AlbertConfig
-from transformers.modeling_bert import ACT2FN, BertEmbeddings, BertSelfAttention, prune_linear_layer
+# from transformers.configuration_albert import AlbertConfig
+from transformers.modeling_bert import ACT2FN, BertEmbeddings, BertSelfAttention
 from transformers.modeling_utils import PreTrainedModel, prune_linear_layer
 
 from .file_utils import add_start_docstrings, add_start_docstrings_to_callable
@@ -195,9 +195,6 @@ class AlbertAttention(BertSelfAttention):
             mask_init=config.mask_init,
             mask_scale=config.mask_scale,
         )
-        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
-        self.pruned_heads = set()
-
         self.query = MaskedLinear(
             config.hidden_size,
             self.all_head_size,
@@ -219,34 +216,37 @@ class AlbertAttention(BertSelfAttention):
             mask_init=config.mask_init,
             mask_scale=config.mask_scale,
         )
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.pruned_heads = set()
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(*new_x_shape)
         return x.permute(0, 2, 1, 3)
 
-    # def prune_heads(self, heads):
-    #     if len(heads) == 0:
-    #         return
-    #     mask = torch.ones(self.num_attention_heads, self.attention_head_size)
-    #     heads = set(heads) - self.pruned_heads  # Convert to set and emove already pruned heads
-    #     for head in heads:
-    #         # Compute how many pruned heads are before the head and move the index accordingly
-    #         head = head - sum(1 if h < head else 0 for h in self.pruned_heads)
-    #         mask[head] = 0
-    #     mask = mask.view(-1).contiguous().eq(1)
-    #     index = torch.arange(len(mask))[mask].long()
-    #
-    #     # Prune linear layers
-    #     self.query = prune_linear_layer(self.query, index)
-    #     self.key = prune_linear_layer(self.key, index)
-    #     self.value = prune_linear_layer(self.value, index)
-    #     self.dense = prune_linear_layer(self.dense, index, dim=1)
-    #
-    #     # Update hyper params and store pruned heads
-    #     self.num_attention_heads = self.num_attention_heads - len(heads)
-    #     self.all_head_size = self.attention_head_size * self.num_attention_heads
-    #     self.pruned_heads = self.pruned_heads.union(heads)
+    #used to be commented out
+    def prune_heads(self, heads):
+        if len(heads) == 0:
+            return
+        mask = torch.ones(self.num_attention_heads, self.attention_head_size)
+        heads = set(heads) - self.pruned_heads  # Convert to set and emove already pruned heads
+        for head in heads:
+            # Compute how many pruned heads are before the head and move the index accordingly
+            head = head - sum(1 if h < head else 0 for h in self.pruned_heads)
+            mask[head] = 0
+        mask = mask.view(-1).contiguous().eq(1)
+        index = torch.arange(len(mask))[mask].long()
+
+        # Prune linear layers
+        self.query = prune_linear_layer(self.query, index)
+        self.key = prune_linear_layer(self.key, index)
+        self.value = prune_linear_layer(self.value, index)
+        self.dense = prune_linear_layer(self.dense, index, dim=1)
+
+        # Update hyper params and store pruned heads
+        self.num_attention_heads = self.num_attention_heads - len(heads)
+        self.all_head_size = self.attention_head_size * self.num_attention_heads
+        self.pruned_heads = self.pruned_heads.union(heads)
 
     def forward(self, input_ids, attention_mask=None, head_mask=None, threshold=None):
         mixed_query_layer = self.query(input_ids, threshold=threshold)
@@ -306,19 +306,36 @@ class AlbertLayer(nn.Module):
         #    self.crossattention = AlbertAttention(config)
         #self.intermediate = AlbertIntermediate(config)
         #self.output = AlbertOutput(config)
-        self.ffn = nn.Linear(config.hidden_size, config.intermediate_size)
-        self.ffn_output = nn.Linear(config.intermediate_size, config.hidden_size)
+
+        # self.ffn = nn.Linear(config.hidden_size, config.intermediate_size)
+        # self.ffn_output = nn.Linear(config.intermediate_size, config.hidden_size)
+
+        self.ffn = MaskedLinear(
+            config.hidden_size,
+            config.intermediate_size,
+            pruning_method=config.pruning_method,
+            mask_init=config.mask_init,
+            mask_scale=config.mask_scale,
+        )
+
+        self.ffn_output = MaskedLinear(
+            config.intermediate_size,
+            config.hidden_size,
+            pruning_method=config.pruning_method,
+            mask_init=config.mask_init,
+            mask_scale=config.mask_scale,
+        )
+
         self.activation = ACT2FN[config.hidden_act]
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, threshold=None):
         attention_output = self.attention(hidden_states, attention_mask, head_mask, threshold=threshold)
         #threshold here???
-        ffn_output = self.ffn(attention_output[0])
+        ffn_output = self.ffn(attention_output[0], threshold=threshold)
         ffn_output = self.activation(ffn_output)
-        ffn_output = self.ffn_output(ffn_output)
+        ffn_output = self.ffn_output(ffn_output, threshold=threshold)
         hidden_states = self.full_layer_layer_norm(ffn_output + attention_output[0])
         outputs = (hidden_states,) + attention_output[1:]  # add attentions if we output them
-        #print(outputs)
         return outputs
 
 
@@ -488,6 +505,7 @@ class MaskedAlbertModel(MaskedAlbertPreTrainedModel):
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
+        self.embeddings.requires_grad_(requires_grad=False)
         self.encoder = AlbertTransformer(config)
         self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_activation = nn.Tanh()
@@ -628,14 +646,16 @@ class MaskedAlbertMLMHead(nn.Module):
 
         self.LayerNorm = nn.LayerNorm(config.embedding_size)
         self.bias = nn.Parameter(torch.zeros(config.vocab_size))
-        #self.dense = nn.Linear(config.hidden_size, config.embedding_size)
-        self.dense = MaskedLinear(
-            config.hidden_size,
-            config.hidden_size,
-            pruning_method=config.pruning_method,
-            mask_init=config.mask_init,
-            mask_scale=config.mask_scale,
-        )
+        self.dense = nn.Linear(config.hidden_size, config.embedding_size)
+
+        ####THRESHOLD HERE?
+        # self.dense = MaskedLinear(
+        #     config.hidden_size,
+        #     config.hidden_size,
+        #     pruning_method=config.pruning_method,
+        #     mask_init=config.mask_init,
+        #     mask_scale=config.mask_scale,
+        # )
         self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
         self.activation = ACT2FN[config.hidden_act]
 
@@ -732,7 +752,7 @@ class MaskedAlbertForMaskedLM(MaskedAlbertPreTrainedModel):
         )
         sequence_outputs = outputs[0]
 
-        prediction_scores = self.predictions(sequence_outputs)
+        prediction_scores = self.predictions(sequence_outputs) #threshold=threshold if pruning MLM head
 
         outputs = (prediction_scores,) + outputs[2:]  # Add hidden states and attention if they are here
         if masked_lm_labels is not None:
