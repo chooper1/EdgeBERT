@@ -146,7 +146,7 @@ def regularization(model: nn.Module, mode: str):
     return regu / counter
 
 #def train(args, train_dataset, model, tokenizer, prune_schedule=None, train_highway=False):
-def train(args, train_dataset, model, tokenizer, teacher=None, prune_schedule=None, train_highway=False):
+def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=False):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter()
@@ -870,12 +870,12 @@ def main():
     else:
         teacher = None
 
-    if args.model_type == "bert":
+    if args.model_type == "bert" or args.model_type == "masked_bert":
         model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
         model.bert.init_highway_pooler()
-    elif args.model_type == "albert":
+    elif args.model_type == "albert" or args.model_type == "masked_albert":
         model.albert.encoder.set_early_exit_entropy(args.early_exit_entropy)
-        #model.albert.init_highway_pooler()
+        model.albert.init_highway_pooler()
 
     if args.fxp_and_prune:
          n_train_epochs = int(args.num_train_epochs)

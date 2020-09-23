@@ -578,10 +578,7 @@ def main():
         model.bert.init_highway_pooler()
     elif args.model_type == "albert":
         model.albert.encoder.set_early_exit_entropy(args.early_exit_entropy)
-        #model.albert.init_highway_pooler()
-    else:
-        model.roberta.encoder.set_early_exit_entropy(args.early_exit_entropy)
-        model.roberta.init_highway_pooler()
+        model.albert.init_highway_pooler()
 
     if args.fxp_and_prune:
          n_train_epochs = int(args.num_train_epochs)
@@ -664,8 +661,7 @@ def main():
                 model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
             elif args.model_type=="albert":
                 model.albert.encoder.set_early_exit_entropy(args.early_exit_entropy)
-            else:
-                model.roberta.encoder.set_early_exit_entropy(args.early_exit_entropy)
+
             model.to(args.device)
             result = evaluate(args, model, tokenizer, prefix=prefix,
                               eval_highway=args.eval_highway)
