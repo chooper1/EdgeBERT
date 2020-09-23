@@ -166,6 +166,9 @@ def main(args):
     pruned_model = {}
     
     for name, tensor in model.items():
+        print(name)    
+ 
+    for name, tensor in model.items():
         #temporary fix
         if "albert.encoder.highway.0.pooler.dense.weight" in name:
             pruned_model["albert.encoder.highway.0.pooler.weight"] = tensor
@@ -177,7 +180,7 @@ def main(args):
         elif "embedding" in name or "LayerNorm" in name or "layer_norm" in name or "pooler" in name:
             pruned_model[name] = tensor
             print(f"Copied layer {name}")
-        elif "highway" in name or "ffn" in name: #highway params
+        elif "highway" in name: #highway params
             pruned_model[name] = tensor
             print(f"Copied layer {name}")
         elif "classifier" in name or "qa_output" in name:
