@@ -22,6 +22,9 @@ import torch
 import torch.nn as nn
 from torch.nn import CrossEntropyLoss, MSELoss
 
+#TT added
+from .adaptive_span import AdaptiveSpan
+
 #from emmental import MaskedBertConfig
 from .configuration_albert_masked import MaskedAlbertConfig
 from .masked_nn import MaskedLinear
@@ -179,8 +182,8 @@ class AlbertEmbeddings(BertEmbeddings):
 
 
 class AlbertAttention(BertSelfAttention):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
 
         self.output_attentions = config.output_attentions
         self.num_attention_heads = config.num_attention_heads
@@ -188,6 +191,22 @@ class AlbertAttention(BertSelfAttention):
         self.attention_head_size = config.hidden_size // config.num_attention_heads
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         #self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+
+        self.adapt_span_bool = params["adapt_span_enabled"]
+
+        if self.adapt_span_bool:
+           self.adaptive_span = AdaptiveSpan(
+                params["adapt_span_enabled"],
+                params["attn_span"],
+                params["adapt_span_loss_coeff"],
+                params["adapt_span_ramp"],
+                params["adapt_span_init"],
+                params["adapt_span_cache"],
+                params["nb_heads"],
+                params["bs"],
+                params["mask_size"],
+         )
+
         self.dense = MaskedLinear(
             config.hidden_size,
             config.hidden_size,
@@ -267,6 +286,9 @@ class AlbertAttention(BertSelfAttention):
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
 
+        if self.adapt_span_bool:
+           attention_probs = self.adaptive_span(attention_probs)
+
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
@@ -292,15 +314,18 @@ class AlbertAttention(BertSelfAttention):
         layernormed_context_layer = self.LayerNorm(input_ids + projected_context_layer_dropout)
         return (layernormed_context_layer, attention_probs) if self.output_attentions else (layernormed_context_layer,)
 
+    def get_cache_size(self):
+        return self.adaptive_span.get_cache_size()
+
 AlbertLayerNorm = torch.nn.LayerNorm
 
 class AlbertLayer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
 
         self.config = config
         self.full_layer_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) #comment this??
-        self.attention = AlbertAttention(config)
+        self.attention = AlbertAttention(config, params)
         #self.is_decoder = config.is_decoder
         #if self.is_decoder:
         #    self.crossattention = AlbertAttention(config)
@@ -340,12 +365,12 @@ class AlbertLayer(nn.Module):
 
 
 class AlbertLayerGroup(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
 
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
-        self.albert_layers = nn.ModuleList([AlbertLayer(config) for _ in range(config.inner_group_num)])
+        self.albert_layers = nn.ModuleList([AlbertLayer(config, params=params) for _ in range(config.inner_group_num)])
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, threshold=None):
         layer_hidden_states = ()
@@ -370,14 +395,14 @@ class AlbertLayerGroup(nn.Module):
 
 
 class AlbertTransformer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
 
         self.config = config
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size, config.hidden_size)
-        self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config) for _ in range(config.num_hidden_groups)])
+        self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config, params=params) for _ in range(config.num_hidden_groups)])
 
     def forward(self, hidden_states, attention_mask=None, head_mask=None, threshold=None):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
@@ -500,13 +525,13 @@ class MaskedAlbertModel(MaskedAlbertPreTrainedModel):
     load_tf_weights = load_tf_weights_in_albert
     base_model_prefix = "albert"
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__()
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
         self.embeddings.requires_grad_(requires_grad=False)
-        self.encoder = AlbertTransformer(config)
+        self.encoder = AlbertTransformer(config, params)
         self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_activation = nn.Tanh()
 
@@ -677,10 +702,10 @@ class MaskedAlbertMLMHead(nn.Module):
     "Albert Model with a `language modeling` head on top.", MASKED_ALBERT_START_DOCSTRING,
 )
 class MaskedAlbertForMaskedLM(MaskedAlbertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__()
 
-        self.albert = MaskedAlbertModel(config)
+        self.albert = MaskedAlbertModel(config, params)
         self.predictions = MaskedAlbertMLMHead(config)
 
         self.init_weights()
@@ -769,11 +794,11 @@ class MaskedAlbertForMaskedLM(MaskedAlbertPreTrainedModel):
     MASKED_ALBERT_START_DOCSTRING,
 )
 class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__()
         self.num_labels = config.num_labels
 
-        self.albert = MaskedAlbertModel(config)
+        self.albert = MaskedAlbertModel(config, params)
         self.dropout = nn.Dropout(config.classifier_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
 
@@ -866,11 +891,11 @@ class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
     MASKED_ALBERT_START_DOCSTRING,
 )
 class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__()
         self.num_labels = config.num_labels
 
-        self.albert = MaskedAlbertModel(config)
+        self.albert = MaskedAlbertModel(config, params)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
 
         self.init_weights()

@@ -7,6 +7,7 @@ from torch.nn import CrossEntropyLoss, MSELoss
 from .modeling_albert_masked import MaskedAlbertPreTrainedModel, AlbertLayerNorm, AlbertLayerGroup
 from .modeling_bert_masked import BertEmbeddings
 from .modeling_highway_bert import BertPooler
+from .adaptive_span import AdaptiveSpan
 
 def entropy(x):
     # x: torch.Tensor, logits BEFORE softmax
@@ -59,14 +60,14 @@ class AlbertEmbeddings(BertEmbeddings):
     #     return embeddings
 
 class AlbertTransformer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
 
         self.config = config
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size, config.hidden_size)
-        self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config) for _ in range(config.num_hidden_groups)])
+        self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config, params) for _ in range(config.num_hidden_groups)])
 
         #self.layer = nn.ModuleList([AlbertLayer(config) for _ in range(config.num_hidden_layers)])
         ### try grouping for efficiency
@@ -168,13 +169,13 @@ class AlbertTransformer(nn.Module):
 
 class MaskedAlbertModel(MaskedAlbertPreTrainedModel):
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
         self.embeddings.requires_grad_(requires_grad=False)
-        self.encoder = AlbertTransformer(config)
+        self.encoder = AlbertTransformer(config, params)
         self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_activation = nn.Tanh()
 
@@ -353,12 +354,12 @@ class MaskedAlbertHighway(nn.Module):
 
 
 class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 
-        self.albert = MaskedAlbertModel(config)
+        self.albert = MaskedAlbertModel(config, params)
         self.dropout = nn.Dropout(config.classifier_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
 

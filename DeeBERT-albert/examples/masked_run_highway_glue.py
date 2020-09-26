@@ -332,6 +332,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
 
                 loss = args.alpha_distil * loss_logits + args.alpha_ce * loss
 
+
             # Regularization
             if args.regularization is not None:
                 regu_ = regularization(model=model, mode=args.regularization)
@@ -341,6 +342,14 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                 loss = loss.mean() # mean() to average on multi-gpu parallel training
             if args.gradient_accumulation_steps > 1:
                 loss = loss / args.gradient_accumulation_steps
+
+            # Adaptive Attention Span Loss
+            if args.adaptive:
+               adapt_span_loss = 0.0
+               for l in model.albert.encoder.albert_layer_groups:
+                   for ll in l.albert_layers:
+                       adapt_span_loss += ll.attention.adaptive_span.get_loss()
+               loss += adapt_span_loss 
 
             if args.fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -385,6 +394,11 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                     torch.save(args, os.path.join(output_dir, 'training_args.bin'))
                     logger.info("Saving model checkpoint to %s", output_dir)
 
+            if args.adaptive:
+               for l in model.albert.encoder.albert_layer_groups:
+                   for ll in l.albert_layers:
+                       ll.attention.adaptive_span.clamp_param()
+ 
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
                 break
@@ -399,6 +413,15 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                         mask           = (torch.zeros(parameter.size()) + threshold).cuda()
                         mask           = parameter.abs().ge(Variable(mask)).float()
                         parameter.data = parameter.data * mask.data
+
+        if args.adaptive:
+           logger.info("Adaptive Span Loss: %s", str(adapt_span_loss.item()))
+
+        if args.adaptive:
+           for layer_idx1, i in enumerate(model.albert.encoder.albert_layer_groups): 
+               for layer_idx2, j in enumerate (i.albert_layers):
+                   k = j.attention.adaptive_span.get_current_avg_span()
+                   logger.info("Avg Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, k)  
 
         epoch += 1
 
@@ -674,6 +697,10 @@ def main():
     parser.add_argument('--server_ip', type=str, default='', help="For distant debugging.")
     parser.add_argument('--server_port', type=str, default='', help="For distant debugging.")
 
+    # Adaptive Attention Span
+    parser.add_argument('--adaptive', action='store_true', help="Enable Adaptive Attention Span")
+    parser.add_argument('--adaptive_span_ramp', type=int, default=256, help="Adaptive Attention Span Ramp")
+
     #magnitude pruning (use for embeddings)
     parser.add_argument('--fxp_and_prune', type=int, default=0, help="For pruning.")
     parser.add_argument('--start_epoch', type=int, default=1, help="For pruning.")
@@ -765,6 +792,19 @@ def main():
 
     args = parser.parse_args()
 
+    #Adaptive Attention Span Params
+    params = {
+      "adapt_span_enabled": args.adaptive,
+      "attn_span": 512,
+      "adapt_span_loss_coeff": 0.000005,
+      "adapt_span_ramp": args.adaptive_span_ramp,
+      "adapt_span_init": 0.002,
+      "adapt_span_cache": True,
+      "nb_heads": 12,
+      "bs": args.per_gpu_train_batch_size,
+      "mask_size": [0, 128],
+    }
+
     # Regularization
     if args.regularization == "null":
         args.regularization = None
@@ -847,10 +887,13 @@ def main():
         cache_dir=args.cache_dir if args.cache_dir else None,
         do_lower_case=args.do_lower_case,
     )
+    #print ("check2\n", flush=True)
+    #print ("printing params: ", params, flush=True)
     model = model_class.from_pretrained(
         args.model_name_or_path,
         from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
+        params=params,
         cache_dir=args.cache_dir if args.cache_dir else None,
     )
 
@@ -939,7 +982,7 @@ def main():
         torch.save(args, os.path.join(args.output_dir, 'training_args.bin'))
 
         # Load a trained model and vocabulary that you have fine-tuned
-        model = model_class.from_pretrained(args.output_dir)
+        model = model_class.from_pretrained(args.output_dir, params=params)
         tokenizer = tokenizer_class.from_pretrained(args.output_dir)
         model.to(args.device)
 
@@ -957,7 +1000,7 @@ def main():
             global_step = checkpoint.split('-')[-1] if len(checkpoints) > 1 else ""
             prefix = checkpoint.split('/')[-1] if checkpoint.find('checkpoint') != -1 else ""
 
-            model = model_class.from_pretrained(checkpoint)
+            model = model_class.from_pretrained(checkpoint, params=params)
             if args.model_type=="bert":
                 model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
             elif args.model_type=="albert":

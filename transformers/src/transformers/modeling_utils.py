@@ -25,6 +25,7 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 from torch.nn import functional as F
 
+from .adaptive_span import AdaptiveSpan
 from .configuration_utils import PretrainedConfig
 from .file_utils import (
     DUMMY_INPUTS,
@@ -97,6 +98,7 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
         """
         return {"input_ids": torch.tensor(DUMMY_INPUTS)}
 
+    #def __init__(self, config, params, *inputs, **kwargs):
     def __init__(self, config, *inputs, **kwargs):
         super().__init__()
         if not isinstance(config, PretrainedConfig):
@@ -367,7 +369,9 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
             model = BertModel.from_pretrained('./tf_model/my_tf_checkpoint.ckpt.index', from_tf=True, config=config)
 
         """
+        #print("check1\n", flush=True)
         config = kwargs.pop("config", None)
+        params = kwargs.pop("params", None)
         state_dict = kwargs.pop("state_dict", None)
         cache_dir = kwargs.pop("cache_dir", None)
         from_tf = kwargs.pop("from_tf", False)
@@ -461,7 +465,20 @@ class PreTrainedModel(nn.Module, ModuleUtilsMixin):
             resolved_archive_file = None
 
         # Instantiate model.
-        model = cls(config, *model_args, **model_kwargs)
+        #params = {
+        #  "adapt_span_enabled": args.adaptive,
+        #  "attn_span": 512,
+        #  "adapt_span_loss_coeff": 0.000005,
+        #  "adapt_span_ramp": 32,
+        #  "adapt_span_init": 0.002,
+        #  "adapt_span_cache": True,
+        #  "nb_heads": 12,
+        #  "bs": args.per_gpu_train_batch_size,
+        #  "mask_size": [20, 128],
+        #}
+
+        model = cls(config, params, *model_args, **model_kwargs)
+        #model = cls(config, *model_args, **model_kwargs)
 
         if state_dict is None and not from_tf:
             try:

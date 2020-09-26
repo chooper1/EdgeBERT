@@ -23,6 +23,7 @@ import os
 import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss
+from .adaptive_span import AdaptiveSpan
 
 from .configuration_bert import BertConfig
 from .file_utils import add_start_docstrings, add_start_docstrings_to_callable
@@ -197,7 +198,7 @@ class BertEmbeddings(nn.Module):
 
 
 class BertSelfAttention(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
@@ -215,6 +216,21 @@ class BertSelfAttention(nn.Module):
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
+ 
+        self.adapt_span_bool = params["adapt_span_enabled"]
+
+        if self.adapt_span_bool:
+           self.adaptive_span = AdaptiveSpan(
+                params["adapt_span_enabled"],
+                params["attn_span"],
+                params["adapt_span_loss_coeff"],
+                params["adapt_span_ramp"],
+                params["adapt_span_init"],
+                params["adapt_span_cache"],
+                params["nb_heads"],
+                params["bs"],
+                params["mask_size"],
+        )
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
@@ -256,6 +272,9 @@ class BertSelfAttention(nn.Module):
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
 
+        if self.adapt_span_bool:
+           attention_probs = self.adaptive_span(attention_probs)
+
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
@@ -273,6 +292,8 @@ class BertSelfAttention(nn.Module):
         outputs = (context_layer, attention_probs) if self.output_attentions else (context_layer,)
         return outputs
 
+    def get_cache_size(self):
+        return self.adaptive_span.get_cache_size()
 
 class BertSelfOutput(nn.Module):
     def __init__(self, config):
@@ -289,9 +310,9 @@ class BertSelfOutput(nn.Module):
 
 
 class BertAttention(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
-        self.self = BertSelfAttention(config)
+        self.self = BertSelfAttention(config, params=params)
         self.output = BertSelfOutput(config)
         self.pruned_heads = set()
 
@@ -364,12 +385,12 @@ class BertOutput(nn.Module):
 
 
 class BertLayer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
-        self.attention = BertAttention(config)
+        self.attention = BertAttention(config, params)
         self.is_decoder = config.is_decoder
         if self.is_decoder:
-            self.crossattention = BertAttention(config)
+            self.crossattention = BertAttention(config, params)
         self.intermediate = BertIntermediate(config)
         self.output = BertOutput(config)
 
@@ -400,11 +421,11 @@ class BertLayer(nn.Module):
 
 
 class BertEncoder(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
-        self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList([BertLayer(config, params=params) for _ in range(config.num_hidden_layers)])
 
     def forward(
         self,
@@ -625,12 +646,12 @@ class BertModel(BertPreTrainedModel):
 
     """
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
         self.config = config
 
         self.embeddings = BertEmbeddings(config)
-        self.encoder = BertEncoder(config)
+        self.encoder = BertEncoder(config, params)
         self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -821,10 +842,10 @@ class BertModel(BertPreTrainedModel):
     BERT_START_DOCSTRING,
 )
 class BertForPreTraining(BertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
 
-        self.bert = BertModel(config)
+        self.bert = BertModel(config, params)
         self.cls = BertPreTrainingHeads(config)
 
         self.init_weights()
