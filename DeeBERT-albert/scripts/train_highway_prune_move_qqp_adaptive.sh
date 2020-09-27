@@ -4,7 +4,7 @@ export CUDA_VISIBLE_DEVICES=0
 PATH_TO_DATA=/n/holyscratch01/acc_lab/ttambe/models/DeeBERT-albert/glue
 MODEL_TYPE=masked_albert  # bert or roberta
 MODEL_SIZE=base  # base or large
-DATASET=MNLI  # SST-2, QNLI, QQP, or MNLI
+DATASET=QQP  # SST-2, QNLI, QQP, or MNLI
 MOD_NAME=albert
 
 MODEL_NAME=${MOD_NAME}-${MODEL_SIZE}
@@ -36,22 +36,21 @@ for FINAL_THRESH in $THRESHOLDS; do
     --max_seq_length 128 \
     --per_gpu_eval_batch_size=1 \
     --per_gpu_train_batch_size=32 \
-    --learning_rate 3e-5 \
+    --learning_rate 3e-6 \
     --num_train_epochs $EPOCHS \
     --overwrite_output_dir \
     --seed 42 \
     --output_dir ./saved_models/${MODEL_TYPE}-${MODEL_SIZE}/$DATASET/two_stage_pruned_adaptive_${FINAL_THRESH} \
     --plot_data_dir ./plotting/ \
     --save_steps 0 \
+    --overwrite_cache \
     --adaptive \
     --adaptive_span_ramp 256 \
     --max_span 512 \
-    --overwrite_cache \
     --eval_after_first_stage \
-    --warmup_steps 12000 \
+    --warmup_steps 11000 \
     --mask_scores_learning_rate 1e-2 \
     --initial_threshold 1 --final_threshold ${FINAL_THRESH} \
-    --initial_warmup 1 --final_warmup 1 \
+    --initial_warmup 2 --final_warmup 3 \
     --pruning_method topK --mask_init constant --mask_scale 0. 
-    #--overwrite_cache \
 done

@@ -421,7 +421,9 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
            for layer_idx1, i in enumerate(model.albert.encoder.albert_layer_groups): 
                for layer_idx2, j in enumerate (i.albert_layers):
                    k = j.attention.adaptive_span.get_current_avg_span()
+                   ms = j.attention.adaptive_span.get_current_max_span()
                    logger.info("Avg Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, k)  
+                   logger.info("Max Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, ms)  
 
         epoch += 1
 
@@ -700,6 +702,7 @@ def main():
     # Adaptive Attention Span
     parser.add_argument('--adaptive', action='store_true', help="Enable Adaptive Attention Span")
     parser.add_argument('--adaptive_span_ramp', type=int, default=256, help="Adaptive Attention Span Ramp")
+    parser.add_argument('--max_span', type=int, default=512, help="Adaptive Attention Span Ramp")
 
     #magnitude pruning (use for embeddings)
     parser.add_argument('--fxp_and_prune', type=int, default=0, help="For pruning.")
@@ -795,7 +798,7 @@ def main():
     #Adaptive Attention Span Params
     params = {
       "adapt_span_enabled": args.adaptive,
-      "attn_span": 512,
+      "attn_span": args.max_span,
       "adapt_span_loss_coeff": 0.000005,
       "adapt_span_ramp": args.adaptive_span_ramp,
       "adapt_span_init": 0.002,

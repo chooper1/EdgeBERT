@@ -275,6 +275,15 @@ class AlbertAttention(BertSelfAttention):
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)
+    
+        #print ("size of input_ids: ", input_ids.size()) 
+        #print ("size of query layer: ", query_layer.size())
+        #print ("size of key_layer: ", key_layer.size())
+        #print ("size of value_layer: ", value_layer.size())
+
+        #print ("attention_head_size: ", self.attention_head_size)
+        #print ("hidden_size: ", self.hidden_size)
+        #print ("num_attention_heads: ", self.num_attention_heads)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
         attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
@@ -285,9 +294,12 @@ class AlbertAttention(BertSelfAttention):
 
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        #print ("attn size after Softmax: ", attention_probs.size())
 
         if self.adapt_span_bool:
            attention_probs = self.adaptive_span(attention_probs)
+
+        #print ("attn size after Adaptive Masking: ", attention_probs.size())
 
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.

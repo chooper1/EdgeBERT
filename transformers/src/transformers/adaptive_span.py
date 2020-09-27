@@ -57,6 +57,7 @@ class AdaptiveSpan(nn.Module):
 
         if x.size(0) == mask.size(0):
             x = x * mask  # [bs, nb_heads, 36, 64]) [bs, nb_heads, 1, 64]
+            #print ("masked x.size(): ", x.size())
             return x
         else:
             return x
