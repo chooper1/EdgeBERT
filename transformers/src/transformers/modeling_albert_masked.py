@@ -192,7 +192,10 @@ class AlbertAttention(BertSelfAttention):
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         #self.dense = nn.Linear(config.hidden_size, config.hidden_size)
 
-        self.adapt_span_bool = params["adapt_span_enabled"]
+        if params is not None:
+            self.adapt_span_bool = params["adapt_span_enabled"]
+        else:
+            self.adapt_span_bool = False
 
         if self.adapt_span_bool:
            self.adaptive_span = AdaptiveSpan(
@@ -275,8 +278,8 @@ class AlbertAttention(BertSelfAttention):
         query_layer = self.transpose_for_scores(mixed_query_layer)
         key_layer = self.transpose_for_scores(mixed_key_layer)
         value_layer = self.transpose_for_scores(mixed_value_layer)
-    
-        #print ("size of input_ids: ", input_ids.size()) 
+
+        #print ("size of input_ids: ", input_ids.size())
         #print ("size of query layer: ", query_layer.size())
         #print ("size of key_layer: ", key_layer.size())
         #print ("size of value_layer: ", value_layer.size())

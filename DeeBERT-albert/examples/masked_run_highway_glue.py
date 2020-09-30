@@ -58,7 +58,8 @@ from transformers import (WEIGHTS_NAME, BertConfig,
 
 from transformers.modeling_highway_bert import BertForSequenceClassification
 # from transformers.modeling_highway_roberta import RobertaForSequenceClassification
-from transformers.modeling_highway_albert import AlbertForSequenceClassification
+from transformers.modeling_highway_albert import AlbertForSequenceClassification as AlbertForSequenceClassificationHW
+from transformers.modeling_albert import AlbertForSequenceClassification as AlbertForSequenceClassification
 
 #need to add imports to use bert model
 from transformers.modeling_bert_masked import MaskedBertConfig, MaskedBertForSequenceClassification
@@ -83,7 +84,8 @@ ALL_MODELS = sum((tuple(conf.pretrained_config_archive_map.keys()) for conf in (
 MODEL_CLASSES = {
     'bert': (BertConfig, BertForSequenceClassification, BertTokenizer),
     'masked_bert': (MaskedBertConfig, MaskedBertForSequenceClassification, BertTokenizer),
-    'albert': (AlbertConfig, AlbertForSequenceClassification, AlbertTokenizer),
+    'albert': (AlbertConfig, AlbertForSequenceClassificationHW, AlbertTokenizer),
+    'albert_teacher': (AlbertConfig, AlbertForSequenceClassification, AlbertTokenizer),
     'masked_albert': (MaskedAlbertConfig, MaskedAlbertForSequenceClassification, AlbertTokenizer),
 }
 
@@ -304,7 +306,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                       'attention_mask': batch[1],
                       'labels':         batch[3]}
             if args.model_type != 'distilbert': # and args.model_type != 'albert':
-                inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'albert', 'masked_albert'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
+                inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'albert', 'masked_albert', 'albert_teacher'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
             inputs['train_highway'] = train_highway
             if "masked" in args.model_type:
                  inputs["threshold"] = threshold
@@ -312,7 +314,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
             outputs = model(**inputs)
             #loss, logits_stu = outputs  # model outputs are always tuple in transformers (see doc)
             loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
-
+            logits_stu = outputs[1]
             # Distillation loss
             if teacher is not None:
                 if "token_type_ids" not in inputs:
@@ -349,7 +351,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                for l in model.albert.encoder.albert_layer_groups:
                    for ll in l.albert_layers:
                        adapt_span_loss += ll.attention.adaptive_span.get_loss()
-               loss += adapt_span_loss 
+               loss += adapt_span_loss
 
             if args.fp16:
                 with amp.scale_loss(loss, optimizer) as scaled_loss:
@@ -398,7 +400,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                for l in model.albert.encoder.albert_layer_groups:
                    for ll in l.albert_layers:
                        ll.attention.adaptive_span.clamp_param()
- 
+
             if args.max_steps > 0 and global_step > args.max_steps:
                 epoch_iterator.close()
                 break
@@ -418,12 +420,12 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
            logger.info("Adaptive Span Loss: %s", str(adapt_span_loss.item()))
 
         if args.adaptive:
-           for layer_idx1, i in enumerate(model.albert.encoder.albert_layer_groups): 
+           for layer_idx1, i in enumerate(model.albert.encoder.albert_layer_groups):
                for layer_idx2, j in enumerate (i.albert_layers):
                    k = j.attention.adaptive_span.get_current_avg_span()
                    ms = j.attention.adaptive_span.get_current_max_span()
-                   logger.info("Avg Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, k)  
-                   logger.info("Max Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, ms)  
+                   logger.info("Avg Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, k)
+                   logger.info("Max Attn Span for layer %d,%d =%d\t", layer_idx1, layer_idx2, ms)
 
         epoch += 1
 
@@ -481,7 +483,7 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
                           'attention_mask': batch[1],
                           'labels':         batch[3]}
                 if args.model_type != 'distilbert': # and args.model_type != 'albert':
-                    inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'albert', 'masked_albert'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
+                    inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'albert', 'masked_albert', 'albert_teacher'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
 
                 if "masked" in args.model_type:
                     inputs["threshold"] = args.final_threshold
@@ -960,10 +962,10 @@ def main():
             result = evaluate(args, model, tokenizer, prefix="")
             print_result = get_wanted_result(result)
 
-        if args.fxp_and_prune:
-            train(args, train_dataset, model, tokenizer, teacher=teacher, prune_schedule=prune_schedule, train_highway=True)
-        else:
-            train(args, train_dataset, model, tokenizer, teacher=teacher, train_highway=True)
+        # if args.fxp_and_prune:
+        #     train(args, train_dataset, model, tokenizer, teacher=teacher, prune_schedule=prune_schedule, train_highway=True)
+        # else:
+        #     train(args, train_dataset, model, tokenizer, teacher=teacher, train_highway=True)
         # train(args, train_dataset, model, tokenizer, teacher=teacher, train_highway=True)
 
 

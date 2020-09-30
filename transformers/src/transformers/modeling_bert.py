@@ -216,8 +216,11 @@ class BertSelfAttention(nn.Module):
         self.value = nn.Linear(config.hidden_size, self.all_head_size)
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
- 
-        self.adapt_span_bool = params["adapt_span_enabled"]
+
+        if params is not None:
+            self.adapt_span_bool = params["adapt_span_enabled"]
+        else:
+            self.adapt_span_bool = False
 
         if self.adapt_span_bool:
            self.adaptive_span = AdaptiveSpan(
