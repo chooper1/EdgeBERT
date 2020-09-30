@@ -1442,6 +1442,7 @@ class BertForQuestionAnswering(BertPreTrainedModel):
     def __init__(self, config):
         super(BertForQuestionAnswering, self).__init__(config)
         self.num_labels = config.num_labels
+        self.num_layers = config.num_hidden_layers
 
         self.bert = BertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)

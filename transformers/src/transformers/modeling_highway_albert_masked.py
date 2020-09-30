@@ -488,6 +488,7 @@ class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
     def __init__(self, config, params):
         super().__init__(config)
         self.num_labels = config.num_labels
+        self.num_layers = config.num_hidden_layers
 
         #self.albert = AlbertModel(config)
         self.albert = MaskedAlbertModel(config, params)

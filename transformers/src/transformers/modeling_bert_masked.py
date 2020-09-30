@@ -929,6 +929,7 @@ class MaskedBertForQuestionAnswering(MaskedBertPreTrainedModel):
     def __init__(self, config):
         super().__init__(config)
         self.num_labels = config.num_labels
+        self.num_layers = config.num_hidden_layers
 
         self.bert = MaskedBertModel(config)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
