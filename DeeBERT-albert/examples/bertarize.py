@@ -189,6 +189,9 @@ def main(args):
         elif "bias" in name:
             pruned_model[name] = tensor
             print(f"Copied layer {name}")
+        elif "adaptive_span" in name:
+            pruned_model[name] = tensor
+            print(f"Copied layer {name}")
         else:
             if pruning_method == "magnitude":
                 mask = MagnitudeBinarizer.apply(inputs=tensor, threshold=threshold)
