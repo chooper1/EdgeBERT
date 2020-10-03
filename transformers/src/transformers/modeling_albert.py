@@ -445,7 +445,8 @@ class AlbertModel(AlbertPreTrainedModel):
     base_model_prefix = "albert"
 
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
+        # super().__init__()
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)

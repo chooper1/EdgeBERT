@@ -57,14 +57,14 @@ class AlbertEmbeddings(BertEmbeddings):
     #     return embeddings
 
 class AlbertTransformer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
 
         self.config = config
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size, config.hidden_size)
-        self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config) for _ in range(config.num_hidden_groups)])
+        self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config, params) for _ in range(config.num_hidden_groups)])
 
         #self.layer = nn.ModuleList([AlbertLayer(config) for _ in range(config.num_hidden_layers)])
         ### try grouping for efficiency
@@ -165,13 +165,15 @@ class AlbertTransformer(nn.Module):
 
 class AlbertModel(AlbertPreTrainedModel):
 
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
+        # super().__init__(config)
+        # super().__init__()
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
         self.embeddings.requires_grad_(requires_grad=False)
-        self.encoder = AlbertTransformer(config)
+        self.encoder = AlbertTransformer(config, params)
         self.pooler = nn.Linear(config.hidden_size, config.hidden_size)
         self.pooler_activation = nn.Tanh()
 
@@ -349,12 +351,12 @@ class AlbertHighway(nn.Module):
 
 
 class AlbertForSequenceClassification(AlbertPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 
-        self.albert = AlbertModel(config)
+        self.albert = AlbertModel(config, params)
         self.dropout = nn.Dropout(config.classifier_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
 
@@ -548,6 +550,7 @@ class AlbertForQuestionAnswering(AlbertPreTrainedModel):
         start_scores, end_scores = model(**input_dict)
 
         """
+        exit_layer = self.num_layers
 
         try:
             outputs = self.albert(
@@ -567,21 +570,23 @@ class AlbertForQuestionAnswering(AlbertPreTrainedModel):
             end_logits = end_logits.squeeze(-1)
 
             outputs = (start_logits, end_logits,) + outputs[2:]
+            #print(outputs)
 
         except HighwayException as e:
             outputs = e.message
             exit_layer = e.exit_layer
             start_logits = outputs[0]
             end_logits = outputs[1]
+            logits = outputs[:2]
 
         if not self.training:
-            # original_start_entropy = entropy(start_logits)
-            # original_end_entropy = entropy(end_logits)
+            original_start_entropy = entropy(start_logits)
+            original_end_entropy = entropy(end_logits)
             original_entropy = entropy(logits)
             highway_entropy = []
-            # highway_start_logits_all = []
-            # highway_end_logits_all = []
-            highway_logits_all = []
+            highway_start_logits_all = []
+            highway_end_logits_all = []
+
 
         if start_positions is not None and end_positions is not None:
             # If we are on multi-GPU, split add a dimension
@@ -604,30 +609,35 @@ class AlbertForQuestionAnswering(AlbertPreTrainedModel):
             # highway_losses = []
             # for highway_exit in outputs[-1]:
             #     highway_start_logits = highway_exit[0]
-            #     highway_end_logits = highway_exit[1]
             #
             #     if not self.training:
-            #         highway_start_logits_all.append(highway_start_logits)
-            #         highway_end_logits_all.append(highway_end_logits)
+            #         highway_logits_all.append(highway_logits)
             #         highway_entropy.append(highway_exit[2])
-            #
-            #     loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-            #     start_loss = loss_fct(highway_start_logits, start_positions)
-            #     end_loss = loss_fct(highway_end_logits, end_positions)
-            #     highway_loss = (start_loss + end_loss) / 2
-            #     highway_losses.append(highway_loss)
-            #
-            # if train_highway:
-            #     outputs = (sum(highway_losses[:-1]),) + outputs
-            #     # exclude the final highway, of course
-            # else:
-            #     outputs = (loss,) + outputs
+
+            # work with highway exits
+            for highway_exit in outputs[-1]:
+                highway_start_logits = highway_exit[0]
+                highway_end_logits = highway_exit[1]
+
+                print(highway_start_logits.size())
+                print(highway_end_logits.size())
+
+                if not self.training:
+                    highway_start_logits_all.append(highway_start_logits)
+                    highway_end_logits_all.append(highway_end_logits)
+                    highway_entropy.append(highway_exit[2])
 
         if not self.training:
             outputs = outputs + ((original_entropy, highway_entropy), exit_layer)
             if output_layer >= 0:
-                outputs = (outputs[0],) +\
-                          (highway_logits_all[output_layer],) +\
-                          outputs[2:]  ## use the highway of the last layer
 
+                #error is being caused by something here
+                outputs = (outputs[0],) +\
+                          (highway_start_logits_all[output_layer],) +\
+                          (highway_end_logits_all[output_layer],) +\
+                          outputs[3:]  ## use the highway of the last layer
+                          #outputs[2:] ?
+                #print('highway')
+                #print(outputs)
+        print('bye')
         return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)

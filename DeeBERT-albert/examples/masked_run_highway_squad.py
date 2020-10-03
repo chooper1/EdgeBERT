@@ -598,6 +598,10 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
             eval_feature = features[example_index.item()]
             unique_id = int(eval_feature.unique_id)
 
+            # for output in outputs:
+            #     print(output)
+            #     print(output.detach().cpu().tolist())
+
             output = [to_list(output[i]) for output in outputs]
 
             # Some models (XLNet, XLM) use 5 arguments for their predictions, while the other "simpler"
