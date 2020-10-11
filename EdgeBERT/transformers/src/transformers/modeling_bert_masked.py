@@ -26,6 +26,9 @@ import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss, MSELoss
 
+#TT added
+from .adaptive_span import AdaptiveSpan
+
 # from emmental import MaskedBertConfig
 # from emmental.modules import MaskedLinear
 from .configuration_bert_masked import MaskedBertConfig
@@ -79,7 +82,7 @@ class BertEmbeddings(nn.Module):
 
 
 class BertSelfAttention(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(config, "embedding_size"):
             raise ValueError(
@@ -91,6 +94,25 @@ class BertSelfAttention(nn.Module):
         self.num_attention_heads = config.num_attention_heads
         self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
+
+        #adaptive attention
+        if params is not None:
+            self.adapt_span_bool = params["adapt_span_enabled"]
+        else:
+            self.adapt_span_bool = False
+
+        if self.adapt_span_bool:
+           self.adaptive_span = AdaptiveSpan(
+                params["adapt_span_enabled"],
+                params["attn_span"],
+                params["adapt_span_loss_coeff"],
+                params["adapt_span_ramp"],
+                params["adapt_span_init"],
+                params["adapt_span_cache"],
+                params["nb_heads"],
+                params["bs"],
+                params["mask_size"],
+         )
 
         self.query = MaskedLinear(
             config.hidden_size,
@@ -157,6 +179,10 @@ class BertSelfAttention(nn.Module):
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
 
+        #adaptive attention
+        if self.adapt_span_bool:
+           attention_probs = self.adaptive_span(attention_probs)
+
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
@@ -173,6 +199,9 @@ class BertSelfAttention(nn.Module):
 
         outputs = (context_layer, attention_probs) if self.output_attentions else (context_layer,)
         return outputs
+
+    def get_cache_size(self):
+        return self.adaptive_span.get_cache_size()
 
 
 class BertSelfOutput(nn.Module):
@@ -196,9 +225,9 @@ class BertSelfOutput(nn.Module):
 
 
 class BertAttention(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
-        self.self = BertSelfAttention(config)
+        self.self = BertSelfAttention(config, params=params)
         self.output = BertSelfOutput(config)
         self.pruned_heads = set()
 
@@ -289,12 +318,12 @@ class BertOutput(nn.Module):
 
 
 class BertLayer(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
-        self.attention = BertAttention(config)
+        self.attention = BertAttention(config, params)
         self.is_decoder = config.is_decoder
         if self.is_decoder:
-            self.crossattention = BertAttention(config)
+            self.crossattention = BertAttention(config, params)
         self.intermediate = BertIntermediate(config)
         self.output = BertOutput(config)
 
@@ -325,11 +354,11 @@ class BertLayer(nn.Module):
 
 
 class BertEncoder(nn.Module):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__()
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
-        self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList([BertLayer(config, params=params) for _ in range(config.num_hidden_layers)])
 
     def forward(
         self,
@@ -476,13 +505,13 @@ class MaskedBertModel(MaskedBertPreTrainedModel):
     Note that we freeze the embeddings modules from their pre-trained values.
     """
 
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__(config)
         self.config = config
 
         self.embeddings = BertEmbeddings(config)
         self.embeddings.requires_grad_(requires_grad=False)
-        self.encoder = BertEncoder(config)
+        self.encoder = BertEncoder(config, params)
         self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -664,11 +693,11 @@ class MaskedBertModel(MaskedBertPreTrainedModel):
     MASKED_BERT_START_DOCSTRING,
 )
 class MaskedBertForSequenceClassification(MaskedBertPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__(config)
         self.num_labels = config.num_labels
 
-        self.bert = MaskedBertModel(config)
+        self.bert = MaskedBertModel(config, params)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
 
@@ -926,12 +955,12 @@ class MaskedBertForTokenClassification(MaskedBertPreTrainedModel):
     MASKED_BERT_START_DOCSTRING,
 )
 class MaskedBertForQuestionAnswering(MaskedBertPreTrainedModel):
-    def __init__(self, config):
+    def __init__(self, config, params):
         super().__init__(config)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 
-        self.bert = MaskedBertModel(config)
+        self.bert = MaskedBertModel(config, params)
         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
 
         self.init_weights()

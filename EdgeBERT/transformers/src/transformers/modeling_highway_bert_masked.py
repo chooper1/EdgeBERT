@@ -7,6 +7,7 @@ from .modeling_bert import BertLayerNorm
 
 from .modeling_bert_masked import MaskedBertPreTrainedModel, BertLayer
 # from .modeling_bert_masked import BertEmbeddings
+from .adaptive_span import AdaptiveSpan
 
 def entropy(x):
     # x: torch.Tensor, logits BEFORE softmax
@@ -56,11 +57,11 @@ class BertEmbeddings(nn.Module):
 
 
 class BertEncoder(nn.Module):
-    def __init__(self, config):
-        super(BertEncoder, self).__init__()
+    def __init__(self, config, params):
+        super(BertEncoder, self).__init__(config, params)
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
-        self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList([BertLayer(config, params) for _ in range(config.num_hidden_layers)])
         self.highway = nn.ModuleList([BertHighway(config) for _ in range(config.num_hidden_layers)])
 
         self.early_exit_entropy = [-1 for _ in range(config.num_hidden_layers)]
@@ -184,13 +185,13 @@ class MaskedBertModel(MaskedBertPreTrainedModel):
         last_hidden_states = outputs[0]  # The last hidden-state is the first element of the output tuple
 
     """
-    def __init__(self, config):
-        super(MaskedBertModel, self).__init__(config)
+    def __init__(self, config, params):
+        super(MaskedBertModel, self).__init__(config, params)
         self.config = config
 
         self.embeddings = BertEmbeddings(config)
         self.embeddings.requires_grad_(requires_grad=False)
-        self.encoder = BertEncoder(config)
+        self.encoder = BertEncoder(config, params)
         self.pooler = BertPooler(config)
 
         self.init_weights()
@@ -380,8 +381,8 @@ class MaskedBertForSequenceClassification(MaskedBertPreTrainedModel):
         loss, logits = outputs[:2]
 
     """
-    def __init__(self, config):
-        super(MaskedBertForSequenceClassification, self).__init__(config)
+    def __init__(self, config, params):
+        super(MaskedBertForSequenceClassification, self).__init__(config, params)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 
