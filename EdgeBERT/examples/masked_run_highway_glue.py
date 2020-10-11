@@ -63,8 +63,9 @@ from transformers.modeling_highway_albert import AlbertForSequenceClassification
 from transformers.modeling_albert import AlbertForSequenceClassification as AlbertForSequenceClassification
 
 #need to add imports to use bert model
-from transformers.modeling_bert_masked import MaskedBertConfig, MaskedBertForSequenceClassification
+from transformers.modeling_bert_masked import MaskedBertConfig #MaskedBertForSequenceClassification
 from transformers.modeling_albert_masked import MaskedAlbertConfig #MaskedAlbertForSequenceClassification
+from transformers.modeling_highway_bert_masked import MaskedBertForSequenceClassification
 from transformers.modeling_highway_albert_masked import MaskedAlbertForSequenceClassification
 
 from transformers import AdamW, get_linear_schedule_with_warmup
