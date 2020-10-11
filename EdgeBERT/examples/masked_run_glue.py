@@ -33,14 +33,20 @@ from tqdm import tqdm, trange
 #from emmental import MaskedBertConfig, MaskedBertForSequenceClassification
 from transformers.modeling_bert_masked import MaskedBertConfig, MaskedBertForSequenceClassification
 from transformers.modeling_albert_masked import MaskedAlbertConfig, MaskedAlbertForSequenceClassification
+
+from transformers.modeling_albert import AlbertForSequenceClassification
+
 from transformers import (
     WEIGHTS_NAME,
     AdamW,
     BertConfig,
     BertForSequenceClassification,
     BertTokenizer,
+    AlbertConfig,
+    AlbertTokenizer,
     get_linear_schedule_with_warmup,
 )
+
 from transformers import glue_compute_metrics as compute_metrics
 from transformers import glue_convert_examples_to_features as convert_examples_to_features
 from transformers import glue_output_modes as output_modes
@@ -58,6 +64,8 @@ logger = logging.getLogger(__name__)
 MODEL_CLASSES = {
     "bert": (BertConfig, BertForSequenceClassification, BertTokenizer),
     "masked_bert": (MaskedBertConfig, MaskedBertForSequenceClassification, BertTokenizer),
+    "albert": (AlbertConfig, AlbertForSequenceClassification, AlbertTokenizer),
+    "masked_albert": (MaskedAlbertConfig, MaskedAlbertForSequenceClassification, AlbertTokenizer),
 }
 
 
@@ -262,7 +270,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
             inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
             if args.model_type != "distilbert":
                 inputs["token_type_ids"] = (
-                    batch[2] if args.model_type in ["bert", "masked_bert", "xlnet", "albert"] else None
+                    batch[2] if args.model_type in ["bert", "masked_bert", "xlnet", "albert", "masked_albert"] else None
                 )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
 
             if "masked" in args.model_type:
@@ -453,7 +461,7 @@ def evaluate(args, model, tokenizer, prefix=""):
                 inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
                 if args.model_type != "distilbert":
                     inputs["token_type_ids"] = (
-                        batch[2] if args.model_type in ["bert", "masked_bert", "xlnet", "albert"] else None
+                        batch[2] if args.model_type in ["bert", "masked_bert", "xlnet", "albert", "masked_albert"] else None
                     )  # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
 
                 if "masked" in args.model_type:

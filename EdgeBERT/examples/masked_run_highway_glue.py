@@ -44,6 +44,7 @@ from tqdm import tqdm, trange
 
 from transformers import (WEIGHTS_NAME, BertConfig,
                                   BertTokenizer,
+                                  BertForSequenceClassification,
                                   AlbertConfig,
                                   AlbertTokenizer,
                                   RobertaConfig,
@@ -56,16 +57,15 @@ from transformers import (WEIGHTS_NAME, BertConfig,
                                   DistilBertForSequenceClassification,
                                   DistilBertTokenizer)
 
-from transformers.modeling_highway_bert import BertForSequenceClassification
-# from transformers.modeling_highway_roberta import RobertaForSequenceClassification
+from transformers.modeling_highway_bert import BertForSequenceClassification as BertForSequenceClassificationHW
 from transformers.modeling_highway_albert import AlbertForSequenceClassification as AlbertForSequenceClassificationHW
+
 from transformers.modeling_albert import AlbertForSequenceClassification as AlbertForSequenceClassification
 
 #need to add imports to use bert model
 from transformers.modeling_bert_masked import MaskedBertConfig, MaskedBertForSequenceClassification
 from transformers.modeling_albert_masked import MaskedAlbertConfig #MaskedAlbertForSequenceClassification
 from transformers.modeling_highway_albert_masked import MaskedAlbertForSequenceClassification
-
 
 from transformers import AdamW, get_linear_schedule_with_warmup
 
@@ -82,10 +82,11 @@ ALL_MODELS = sum((tuple(conf.pretrained_config_archive_map.keys()) for conf in (
 #'bert': (BertConfig, MaskedBertForSequenceClassification, BertTokenizer),
 #'albert': (AlbertConfig, MaskedAlbertForSequenceClassification, AlbertTokenizer),
 MODEL_CLASSES = {
-    'bert': (BertConfig, BertForSequenceClassification, BertTokenizer),
-    'masked_bert': (MaskedBertConfig, MaskedBertForSequenceClassification, BertTokenizer),
+    'bert': (BertConfig, BertForSequenceClassificationHW, BertTokenizer),
+    'bert_teacher': (BertConfig, BertForSequenceClassification, BertTokenizer),
     'albert': (AlbertConfig, AlbertForSequenceClassificationHW, AlbertTokenizer),
     'albert_teacher': (AlbertConfig, AlbertForSequenceClassification, AlbertTokenizer),
+    'masked_bert': (MaskedBertConfig, MaskedBertForSequenceClassification, BertTokenizer),
     'masked_albert': (MaskedAlbertConfig, MaskedAlbertForSequenceClassification, AlbertTokenizer),
 }
 
@@ -306,7 +307,7 @@ def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=Fal
                       'attention_mask': batch[1],
                       'labels':         batch[3]}
             if args.model_type != 'distilbert': # and args.model_type != 'albert':
-                inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'albert', 'masked_albert', 'albert_teacher'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
+                inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'bert_teacher', 'albert', 'masked_albert', 'albert_teacher'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
             inputs['train_highway'] = train_highway
             if "masked" in args.model_type:
                  inputs["threshold"] = threshold
@@ -483,7 +484,7 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
                           'attention_mask': batch[1],
                           'labels':         batch[3]}
                 if args.model_type != 'distilbert': # and args.model_type != 'albert':
-                    inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'albert', 'masked_albert', 'albert_teacher'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
+                    inputs['token_type_ids'] = batch[2] if args.model_type in ['bert', 'masked_bert', 'bert_teacher', 'albert', 'masked_albert', 'albert_teacher'] else None  # XLM, DistilBERT and RoBERTa don't use segment_ids
 
                 if "masked" in args.model_type:
                     inputs["threshold"] = args.final_threshold
@@ -962,10 +963,10 @@ def main():
             result = evaluate(args, model, tokenizer, prefix="")
             print_result = get_wanted_result(result)
 
-        # if args.fxp_and_prune:
-        #     train(args, train_dataset, model, tokenizer, teacher=teacher, prune_schedule=prune_schedule, train_highway=True)
-        # else:
-        #     train(args, train_dataset, model, tokenizer, teacher=teacher, train_highway=True)
+        if args.fxp_and_prune:
+            train(args, train_dataset, model, tokenizer, teacher=teacher, prune_schedule=prune_schedule, train_highway=True)
+        else:
+            train(args, train_dataset, model, tokenizer, teacher=teacher, train_highway=True)
         # train(args, train_dataset, model, tokenizer, teacher=teacher, train_highway=True)
 
 
@@ -1007,6 +1008,8 @@ def main():
 
             model = model_class.from_pretrained(checkpoint, params=params)
             if args.model_type=="bert":
+                model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
+            elif args.model_type=="masked_bert":
                 model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
             elif args.model_type=="albert":
                 model.albert.encoder.set_early_exit_entropy(args.early_exit_entropy)
