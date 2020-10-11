@@ -328,8 +328,9 @@ def train(args, train_dataset, model, tokenizer, teacher=None):
                 if args.local_rank in [-1, 0] and args.logging_steps > 0 and global_step % args.logging_steps == 0:
                     tb_writer.add_scalar("threshold", threshold, global_step)
                     for name, param in model.named_parameters():
-                        if not param.requires_grad:
+                        if not param.requires_grad or param.grad is None:
                             continue
+                        print(name)
                         tb_writer.add_scalar("parameter_mean/" + name, param.data.mean(), global_step)
                         tb_writer.add_scalar("parameter_std/" + name, param.data.std(), global_step)
                         tb_writer.add_scalar("parameter_min/" + name, param.data.min(), global_step)

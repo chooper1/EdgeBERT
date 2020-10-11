@@ -541,7 +541,7 @@ class MaskedAlbertModel(MaskedAlbertPreTrainedModel):
     base_model_prefix = "albert"
 
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config)
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
@@ -810,7 +810,7 @@ class MaskedAlbertForMaskedLM(MaskedAlbertPreTrainedModel):
 )
 class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config)
         self.num_labels = config.num_labels
 
         self.albert = MaskedAlbertModel(config, params)
