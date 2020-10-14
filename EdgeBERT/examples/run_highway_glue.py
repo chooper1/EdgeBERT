@@ -460,7 +460,7 @@ def main():
     parser.add_argument(
         "--one_class",
         default=None,
-        type=int,
+        type=bool,
         help="Set this flag if you want only one highway classifier",
     )
 
