@@ -319,7 +319,7 @@ class BertOutput(nn.Module):
 
 class BertLayer(nn.Module):
     def __init__(self, config, params):
-        super().__init__(config, params)
+        super().__init__()
         self.attention = BertAttention(config, params)
         self.is_decoder = config.is_decoder
         if self.is_decoder:

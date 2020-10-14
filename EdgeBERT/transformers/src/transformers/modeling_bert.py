@@ -199,7 +199,7 @@ class BertEmbeddings(nn.Module):
 
 class BertSelfAttention(nn.Module):
     def __init__(self, config, params):
-        super().__init__(config, params)
+        super().__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
