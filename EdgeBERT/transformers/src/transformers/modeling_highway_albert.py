@@ -68,11 +68,13 @@ class AlbertTransformer(nn.Module):
 
         #self.layer = nn.ModuleList([AlbertLayer(config) for _ in range(config.num_hidden_layers)])
         ### try grouping for efficiency
-        self.highway = nn.ModuleList([AlbertHighway(config) for _ in range(config.num_hidden_groups)])
-        #changed from self.highway = nn.ModuleList([AlbertHighway(config) for _ in range(config.num_hidden_layers)])
+        if config.one_class:
+            self.highway = nn.ModuleList([AlbertHighway(config) for _ in range(config.num_hidden_groups)])
+            self.early_exit_entropy = [-1 for _ in range(config.num_hidden_groups)]
+        else:
+            self.highway = nn.ModuleList([AlbertHighway(config) for _ in range(config.num_hidden_layers)])
+            self.early_exit_entropy = [-1 for _ in range(config.num_hidden_layers)]
 
-        #changed from self.early_exit_entropy = [-1 for _ in range(config.num_hidden_layers)]
-        self.early_exit_entropy = [-1 for _ in range(config.num_hidden_groups)]
 
     def set_early_exit_entropy(self, x):
         print(x)
@@ -126,7 +128,12 @@ class AlbertTransformer(nn.Module):
                 current_outputs = current_outputs + (all_attentions,)
 
             #problem:: returns 8*128=1024 instead of 8 cells
-            highway_exit = self.highway[group_idx](current_outputs) #changed from self.highway[i](current_outputs)
+            #highway_exit = self.highway[group_idx](current_outputs) #changed from self.highway[i](current_outputs)
+
+            if config.one_class:
+                highway_exit = self.highway[group_idx](current_outputs)
+            else:
+                highway_exit = self.highway[i](current_outputs)
             #highway_exit = self.highway[group_idx](current_outputs)
 
             #added this section
@@ -136,7 +143,13 @@ class AlbertTransformer(nn.Module):
                 highway_exit = highway_exit + (highway_entropy,)  # logits, hidden_states(?), entropy
                 all_highway_exits = all_highway_exits + (highway_exit,)
 
-                if highway_entropy < self.early_exit_entropy[group_idx]:
+                if config.one_class:
+                    ent_ = self.early_exit_entropy[group_idx]
+                else:
+                    ent_ = self.early_exit_entropy[i]
+
+                if highway_entropy < ent_:
+                # if highway_entropy < self.early_exit_entropy[group_idx]:
                     # weight_func = lambda x: torch.exp(-3 * x) - 0.5**3
                     # weight_func = lambda x: 2 - torch.exp(x)
                     # weighted_logits = \

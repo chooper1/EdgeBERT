@@ -457,6 +457,12 @@ def main():
                         help="Set this flag to evaluate after training only bert (not highway).")
     parser.add_argument("--eval_highway", action='store_true',
                         help="Set this flag if it's evaluating highway models")
+    parser.add_argument(
+        "--one_class",
+        default=None,
+        type=int,
+        help="Set this flag if you want only one highway classifier",
+    )
 
     parser.add_argument("--per_gpu_train_batch_size", default=8, type=int,
                         help="Batch size per GPU/CPU for training.")
@@ -562,6 +568,7 @@ def main():
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           num_labels=num_labels,
+                                          one_class=args.one_class,
                                           finetuning_task=args.task_name,
                                           cache_dir=args.cache_dir if args.cache_dir else None)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,

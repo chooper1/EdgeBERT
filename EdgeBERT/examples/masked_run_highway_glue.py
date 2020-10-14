@@ -653,6 +653,12 @@ def main():
                         help="Set this flag to evaluate after training only bert (not highway).")
     parser.add_argument("--eval_highway", action='store_true',
                         help="Set this flag if it's evaluating highway models")
+    parser.add_argument(
+        "--one_class",
+        default=None,
+        type=int,
+        help="Set this flag if you want only one highway classifier",
+    )
 
     parser.add_argument("--per_gpu_train_batch_size", default=8, type=int,
                         help="Batch size per GPU/CPU for training.")
@@ -888,6 +894,7 @@ def main():
         pruning_method=args.pruning_method,
         mask_init=args.mask_init,
         mask_scale=args.mask_scale,
+        one_class=args.one_class,
     )
     tokenizer = tokenizer_class.from_pretrained(
         args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
