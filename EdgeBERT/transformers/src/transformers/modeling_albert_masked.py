@@ -411,7 +411,7 @@ class AlbertLayerGroup(nn.Module):
 
 class AlbertTransformer(nn.Module):
     def __init__(self, config, params):
-        super().__init__(config, params)
+        super().__init__()
 
         self.config = config
         self.output_attentions = config.output_attentions
