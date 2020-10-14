@@ -336,7 +336,7 @@ AlbertLayerNorm = torch.nn.LayerNorm
 
 class AlbertLayer(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.config = config
         self.full_layer_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) #comment this??
@@ -381,7 +381,7 @@ class AlbertLayer(nn.Module):
 
 class AlbertLayerGroup(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
@@ -411,7 +411,7 @@ class AlbertLayerGroup(nn.Module):
 
 class AlbertTransformer(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.config = config
         self.output_attentions = config.output_attentions
@@ -541,7 +541,7 @@ class MaskedAlbertModel(MaskedAlbertPreTrainedModel):
     base_model_prefix = "albert"
 
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
@@ -681,8 +681,8 @@ class MaskedAlbertModel(MaskedAlbertPreTrainedModel):
 
 
 class MaskedAlbertMLMHead(nn.Module):
-    def __init__(self, config):
-        super().__init__()
+    def __init__(self, config, params):
+        super().__init__(config, params)
 
         self.LayerNorm = nn.LayerNorm(config.embedding_size)
         self.bias = nn.Parameter(torch.zeros(config.vocab_size))
@@ -718,7 +718,7 @@ class MaskedAlbertMLMHead(nn.Module):
 )
 class MaskedAlbertForMaskedLM(MaskedAlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.albert = MaskedAlbertModel(config, params)
         self.predictions = MaskedAlbertMLMHead(config)
@@ -810,7 +810,7 @@ class MaskedAlbertForMaskedLM(MaskedAlbertPreTrainedModel):
 )
 class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
         self.num_labels = config.num_labels
 
         self.albert = MaskedAlbertModel(config, params)
@@ -907,7 +907,7 @@ class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
 )
 class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 

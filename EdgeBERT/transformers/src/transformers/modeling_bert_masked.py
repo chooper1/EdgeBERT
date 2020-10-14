@@ -83,7 +83,7 @@ class BertEmbeddings(nn.Module):
 
 class BertSelfAttention(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
         if config.hidden_size % config.num_attention_heads != 0 and not hasattr(config, "embedding_size"):
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
@@ -226,7 +226,7 @@ class BertSelfOutput(nn.Module):
 
 class BertAttention(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
         self.self = BertSelfAttention(config, params=params)
         self.output = BertSelfOutput(config)
         self.pruned_heads = set()
@@ -319,7 +319,7 @@ class BertOutput(nn.Module):
 
 class BertLayer(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
         self.attention = BertAttention(config, params)
         self.is_decoder = config.is_decoder
         if self.is_decoder:
@@ -355,7 +355,7 @@ class BertLayer(nn.Module):
 
 class BertEncoder(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.layer = nn.ModuleList([BertLayer(config, params=params) for _ in range(config.num_hidden_layers)])
@@ -506,7 +506,7 @@ class MaskedBertModel(MaskedBertPreTrainedModel):
     """
 
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
         self.config = config
 
         self.embeddings = BertEmbeddings(config)
@@ -694,7 +694,7 @@ class MaskedBertModel(MaskedBertPreTrainedModel):
 )
 class MaskedBertForSequenceClassification(MaskedBertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
         self.num_labels = config.num_labels
 
         self.bert = MaskedBertModel(config, params)
@@ -779,10 +779,10 @@ class MaskedBertForSequenceClassification(MaskedBertPreTrainedModel):
     MASKED_BERT_START_DOCSTRING,
 )
 class MaskedBertForMultipleChoice(MaskedBertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
 
-        self.bert = MaskedBertModel(config)
+        self.bert = MaskedBertModel(config, params)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, 1)
 
@@ -868,11 +868,11 @@ class MaskedBertForMultipleChoice(MaskedBertPreTrainedModel):
     MASKED_BERT_START_DOCSTRING,
 )
 class MaskedBertForTokenClassification(MaskedBertPreTrainedModel):
-    def __init__(self, config):
-        super().__init__(config)
+    def __init__(self, config, params):
+        super().__init__(config, params)
         self.num_labels = config.num_labels
 
-        self.bert = MaskedBertModel(config)
+        self.bert = MaskedBertModel(config, params)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, config.num_labels)
 
@@ -956,7 +956,7 @@ class MaskedBertForTokenClassification(MaskedBertPreTrainedModel):
 )
 class MaskedBertForQuestionAnswering(MaskedBertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 

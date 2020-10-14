@@ -259,7 +259,7 @@ AlbertLayerNorm = torch.nn.LayerNorm
 
 class AlbertLayer(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.config = config
         self.full_layer_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) #comment this??
@@ -286,7 +286,7 @@ class AlbertLayer(nn.Module):
 
 class AlbertLayerGroup(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
@@ -316,7 +316,7 @@ class AlbertLayerGroup(nn.Module):
 
 class AlbertTransformer(nn.Module):
     def __init__(self, config, params):
-        super().__init__()
+        super().__init__(config, params)
 
         self.config = config
         self.output_attentions = config.output_attentions
@@ -445,7 +445,7 @@ class AlbertModel(AlbertPreTrainedModel):
     base_model_prefix = "albert"
 
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
 
         self.config = config
         self.embeddings = AlbertEmbeddings(config)
@@ -584,8 +584,8 @@ class AlbertModel(AlbertPreTrainedModel):
 
 
 class AlbertMLMHead(nn.Module):
-    def __init__(self, config):
-        super().__init__()
+    def __init__(self, config, params):
+        super().__init__(config, params)
 
         self.LayerNorm = nn.LayerNorm(config.embedding_size)
         self.bias = nn.Parameter(torch.zeros(config.vocab_size))
@@ -612,10 +612,10 @@ class AlbertMLMHead(nn.Module):
 )
 class AlbertForMaskedLM(AlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
 
         self.albert = AlbertModel(config, params)
-        self.predictions = AlbertMLMHead(config)
+        self.predictions = AlbertMLMHead(config, params)
 
         self.init_weights()
         self.tie_weights()
@@ -702,7 +702,7 @@ class AlbertForMaskedLM(AlbertPreTrainedModel):
 )
 class AlbertForSequenceClassification(AlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
         self.num_labels = config.num_labels
 
         self.albert = AlbertModel(config, params)
@@ -797,7 +797,7 @@ class AlbertForSequenceClassification(AlbertPreTrainedModel):
 )
 class AlbertForQuestionAnswering(AlbertPreTrainedModel):
     def __init__(self, config, params):
-        super().__init__(config)
+        super().__init__(config, params)
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 
