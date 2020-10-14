@@ -151,3 +151,4 @@ class MaskedAlbertConfig(PretrainedConfig):
         self.pruning_method = pruning_method
         self.mask_init = mask_init
         self.mask_scale = mask_scale
+        self.one_class = one_class
