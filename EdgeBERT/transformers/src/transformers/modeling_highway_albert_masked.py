@@ -138,7 +138,7 @@ class AlbertTransformer(nn.Module):
             #problem:: returns 8*128=1024 instead of 8 cells
             # highway_exit = self.highway[group_idx](current_outputs) #changed from self.highway[i](current_outputs)
             #highway_exit = self.highway[group_idx](current_outputs)
-            if config.one_class:
+            if self.config.one_class:
                 highway_exit = self.highway[group_idx](current_outputs)
             else:
                 highway_exit = self.highway[i](current_outputs)
@@ -150,7 +150,7 @@ class AlbertTransformer(nn.Module):
                 highway_exit = highway_exit + (highway_entropy,)  # logits, hidden_states(?), entropy
                 all_highway_exits = all_highway_exits + (highway_exit,)
 
-                if config.one_class:
+                if self.config.one_class:
                     ent_ = self.early_exit_entropy[group_idx]
                 else:
                     ent_ = self.early_exit_entropy[i]
