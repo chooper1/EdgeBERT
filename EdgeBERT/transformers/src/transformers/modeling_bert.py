@@ -654,6 +654,7 @@ class BertModel(BertPreTrainedModel):
         self.config = config
 
         self.embeddings = BertEmbeddings(config)
+        self.embeddings.requires_grad_(requires_grad=False)
         self.encoder = BertEncoder(config, params)
         self.pooler = BertPooler(config)
 
