@@ -77,10 +77,10 @@ class AlbertTransformer(nn.Module):
         #changed from self.early_exit_entropy = [-1 for _ in range(config.num_hidden_layers)]
         #self.early_exit_entropy = [-1 for _ in range(config.num_hidden_groups)]
         if config.one_class:
-            self.highway = nn.ModuleList([AlbertHighway(config) for _ in range(config.num_hidden_groups)])
+            self.highway = nn.ModuleList([MaskedAlbertHighway(config) for _ in range(config.num_hidden_groups)])
             self.early_exit_entropy = [-1 for _ in range(config.num_hidden_groups)]
         else:
-            self.highway = nn.ModuleList([AlbertHighway(config) for _ in range(config.num_hidden_layers)])
+            self.highway = nn.ModuleList([MaskedAlbertHighway(config) for _ in range(config.num_hidden_layers)])
             self.early_exit_entropy = [-1 for _ in range(config.num_hidden_layers)]
 
     def set_early_exit_entropy(self, x):
