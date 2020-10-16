@@ -259,7 +259,7 @@ AlbertLayerNorm = torch.nn.LayerNorm
 
 class AlbertLayer(nn.Module):
     def __init__(self, config, params):
-        super().__init__(config, params)
+        super().__init__()
 
         self.config = config
         self.full_layer_layer_norm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps) #comment this??
