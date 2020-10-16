@@ -2,9 +2,9 @@
 export CUDA_VISIBLE_DEVICES=0
 
 PATH_TO_DATA=../glue/
-MODEL_TYPE=albert  # bert or roberta
+MODEL_TYPE=bert  # bert or roberta
 MODEL_SIZE=base  # base or large
-DATASET=MNLI  # SST-2, MRPC, RTE, QNLI, QQP, or MNLI
+DATASET=QQP  # SST-2, MRPC, RTE, QNLI, QQP, or MNLI
 
 MODEL_NAME=${MODEL_TYPE}-${MODEL_SIZE}
 EPOCHS=10

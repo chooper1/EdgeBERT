@@ -655,8 +655,7 @@ def main():
                         help="Set this flag if it's evaluating highway models")
     parser.add_argument(
         "--one_class",
-        default=None,
-        type=bool,
+        action='store_true',
         help="Set this flag if you want only one highway classifier",
     )
 

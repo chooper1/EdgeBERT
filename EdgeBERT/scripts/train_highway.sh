@@ -4,7 +4,7 @@ export CUDA_VISIBLE_DEVICES=0
 PATH_TO_DATA=../glue/
 MODEL_TYPE=albert  # bert or roberta
 MODEL_SIZE=base  # base or large
-DATASET=MNLI  # SST-2, MRPC, RTE, QNLI, QQP, or MNLI
+DATASET=MRPC  # SST-2, MRPC, RTE, QNLI, QQP, or MNLI
 
 MODEL_NAME=${MODEL_TYPE}-${MODEL_SIZE}
 EPOCHS=10
@@ -40,4 +40,6 @@ python ../examples/run_highway_glue.py \
   --plot_data_dir ./plotting/ \
   --save_steps 0 \
   --overwrite_cache \
-  --eval_after_first_stage
+  --eval_after_first_stage \
+  --early_exit_entropy 0.2 \
+  --eval_highway 

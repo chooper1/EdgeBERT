@@ -127,7 +127,7 @@ class MaskedAlbertConfig(PretrainedConfig):
         pruning_method="topK",
         mask_init="constant",
         mask_scale=0.0,
-        one_class=None,
+        one_class=False,
         **kwargs
     ):
         super().__init__(**kwargs)
