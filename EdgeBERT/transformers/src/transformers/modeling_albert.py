@@ -286,7 +286,7 @@ class AlbertLayer(nn.Module):
 
 class AlbertLayerGroup(nn.Module):
     def __init__(self, config, params):
-        super().__init__(config, params)
+        super().__init__()
 
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
