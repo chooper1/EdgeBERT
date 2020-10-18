@@ -124,7 +124,7 @@ class AlbertConfig(PretrainedConfig):
         initializer_range=0.02,
         layer_norm_eps=1e-12,
         classifier_dropout_prob=0.1,
-        one_class=None,
+        one_class=False,
         **kwargs
     ):
         super().__init__(**kwargs)
