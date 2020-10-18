@@ -104,7 +104,7 @@ class MaskedAlbertConfig(PretrainedConfig):
     """
 
     pretrained_config_archive_map = ALBERT_PRETRAINED_CONFIG_ARCHIVE_MAP
-    model_type = "albert"
+    model_type = "masked_albert"
 
     def __init__(
         self,
@@ -124,6 +124,7 @@ class MaskedAlbertConfig(PretrainedConfig):
         initializer_range=0.02,
         layer_norm_eps=1e-12,
         classifier_dropout_prob=0.1,
+        pad_token_id=0,
         pruning_method="topK",
         mask_init="constant",
         mask_scale=0.0,
