@@ -618,6 +618,8 @@ class AlbertForQuestionAnswering(AlbertPreTrainedModel):
             for highway_exit in outputs[-1]:
                 highway_logits = highway_exit[0]
                 highway_start_logits, highway_end_logits = logits.split(1, dim=-1)
+                highway_start_logits = highway_start_logits.squeeze(-1)
+                highway_end_logits = highway_end_logits.squeeze(-1)
 
                 if not self.training:
                     highway_logits_all.append(highway_logits)
