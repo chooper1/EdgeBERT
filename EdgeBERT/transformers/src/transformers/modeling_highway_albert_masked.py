@@ -500,159 +500,158 @@ class MaskedAlbertForSequenceClassification(MaskedAlbertPreTrainedModel):
         return outputs  # (loss), logits, (hidden_states), (attentions)
 
 
-# class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
-#     def __init__(self, config, params):
-#         super().__init__(config)
-#         self.num_labels = config.num_labels
-#         self.num_layers = config.num_hidden_layers
-#
-#         #self.albert = AlbertModel(config)
-#         self.albert = MaskedAlbertModel(config, params)
-#         self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
-#
-#         self.init_weights()
-#
-#     # @add_start_docstrings_to_callable(ALBERT_INPUTS_DOCSTRING)
-#     def forward(
-#         self,
-#         input_ids=None,
-#         attention_mask=None,
-#         token_type_ids=None,
-#         position_ids=None,
-#         head_mask=None,
-#         inputs_embeds=None,
-#         start_positions=None,
-#         end_positions=None,
-#         output_layer=-1,
-#         train_highway=False,
-#         threshold=None
-#     ):
-#         r"""
-#         start_positions (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
-#             Labels for position (index) of the start of the labelled span for computing the token classification loss.
-#             Positions are clamped to the length of the sequence (`sequence_length`).
-#             Position outside of the sequence are not taken into account for computing the loss.
-#         end_positions (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
-#             Labels for position (index) of the end of the labelled span for computing the token classification loss.
-#             Positions are clamped to the length of the sequence (`sequence_length`).
-#             Position outside of the sequence are not taken into account for computing the loss.
-#
-#     Returns:
-#         :obj:`tuple(torch.FloatTensor)` comprising various elements depending on the configuration (:class:`~transformers.AlbertConfig`) and inputs:
-#         loss: (`optional`, returned when ``labels`` is provided) ``torch.FloatTensor`` of shape ``(1,)``:
-#             Total span extraction loss is the sum of a Cross-Entropy for the start and end positions.
-#         start_scores ``torch.FloatTensor`` of shape ``(batch_size, sequence_length,)``
-#             Span-start scores (before SoftMax).
-#         end_scores: ``torch.FloatTensor`` of shape ``(batch_size, sequence_length,)``
-#             Span-end scores (before SoftMax).
-#         hidden_states (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_hidden_states=True``):
-#             Tuple of :obj:`torch.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
-#             of shape :obj:`(batch_size, sequence_length, hidden_size)`.
-#
-#             Hidden-states of the model at the output of each layer plus the initial embedding outputs.
-#         attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_attentions=True``):
-#             Tuple of :obj:`torch.FloatTensor` (one for each layer) of shape
-#             :obj:`(batch_size, num_heads, sequence_length, sequence_length)`.
-#
-#             Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
-#             heads.
-#
-#     Examples::
-#
-#         # The checkpoint albert-base-v2 is not fine-tuned for question answering. Please see the
-#         # examples/run_squad.py example to see how to fine-tune a model to a question answering task.
-#
-#         from transformers import AlbertTokenizer, AlbertForQuestionAnswering
-#         import torch
-#
-#         tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
-#         model = AlbertForQuestionAnswering.from_pretrained('albert-base-v2')
-#         question, text = "Who was Jim Henson?", "Jim Henson was a nice puppet"
-#         input_dict = tokenizer.encode_plus(question, text, return_tensors='pt')
-#         start_scores, end_scores = model(**input_dict)
-#
-#         """
-#
-#         try:
-#             outputs = self.albert(
-#                 input_ids=input_ids,
-#                 attention_mask=attention_mask,
-#                 token_type_ids=token_type_ids,
-#                 position_ids=position_ids,
-#                 head_mask=head_mask,
-#                 inputs_embeds=inputs_embeds,
-#                 threshold=threshold
-#             )
-#
-#             sequence_output = outputs[0]
-#
-#             logits = self.qa_outputs(sequence_output)
-#             start_logits, end_logits = logits.split(1, dim=-1)
-#             start_logits = start_logits.squeeze(-1)
-#             end_logits = end_logits.squeeze(-1)
-#
-#             outputs = (start_logits, end_logits,) + outputs[2:]
-#
-#         except HighwayException as e:
-#             outputs = e.message
-#             exit_layer = e.exit_layer
-#             start_logits = outputs[0]
-#             end_logits = outputs[1]
-#
-#         if not self.training:
-#             # original_start_entropy = entropy(start_logits)
-#             # original_end_entropy = entropy(end_logits)
-#             original_entropy = entropy(logits)
-#             highway_entropy = []
-#             # highway_start_logits_all = []
-#             # highway_end_logits_all = []
-#             highway_logits_all = []
-#
-#         if start_positions is not None and end_positions is not None:
-#             # If we are on multi-GPU, split add a dimension
-#             if len(start_positions.size()) > 1:
-#                 start_positions = start_positions.squeeze(-1)
-#             if len(end_positions.size()) > 1:
-#                 end_positions = end_positions.squeeze(-1)
-#             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-#             ignored_index = start_logits.size(1)
-#             start_positions.clamp_(0, ignored_index)
-#             end_positions.clamp_(0, ignored_index)
-#
-#             loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-#             start_loss = loss_fct(start_logits, start_positions)
-#             end_loss = loss_fct(end_logits, end_positions)
-#             total_loss = (start_loss + end_loss) / 2
-#             outputs = (total_loss,) + outputs
-#
-#             # work with highway exits
-#             # highway_losses = []
-#             # for highway_exit in outputs[-1]:
-#             #     highway_start_logits = highway_exit[0]
-#             #     highway_end_logits = highway_exit[1]
-#             #
-#             #     if not self.training:
-#             #         highway_start_logits_all.append(highway_start_logits)
-#             #         highway_end_logits_all.append(highway_end_logits)
-#             #         highway_entropy.append(highway_exit[2])
-#             #
-#             #     loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
-#             #     start_loss = loss_fct(highway_start_logits, start_positions)
-#             #     end_loss = loss_fct(highway_end_logits, end_positions)
-#             #     highway_loss = (start_loss + end_loss) / 2
-#             #     highway_losses.append(highway_loss)
-#             #
-#             # if train_highway:
-#             #     outputs = (sum(highway_losses[:-1]),) + outputs
-#             #     # exclude the final highway, of course
-#             # else:
-#             #     outputs = (loss,) + outputs
-#
-#         if not self.training:
-#             outputs = outputs + ((original_entropy, highway_entropy), exit_layer)
-#             if output_layer >= 0:
-#                 outputs = (outputs[0],) +\
-#                           (highway_logits_all[output_layer],) +\
-#                           outputs[2:]  ## use the highway of the last layer
-#
-#         return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
+class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
+    def __init__(self, config, params):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.num_layers = config.num_hidden_layers
+
+        #self.albert = AlbertModel(config)
+        self.albert = MaskedAlbertModel(config, params)
+        self.qa_outputs = nn.Linear(config.hidden_size, config.num_labels)
+
+        self.init_weights()
+
+    # @add_start_docstrings_to_callable(ALBERT_INPUTS_DOCSTRING)
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        inputs_embeds=None,
+        start_positions=None,
+        end_positions=None,
+        output_layer=-1,
+        train_highway=False,
+        threshold=None
+    ):
+        r"""
+        start_positions (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
+            Labels for position (index) of the start of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (`sequence_length`).
+            Position outside of the sequence are not taken into account for computing the loss.
+        end_positions (:obj:`torch.LongTensor` of shape :obj:`(batch_size,)`, `optional`, defaults to :obj:`None`):
+            Labels for position (index) of the end of the labelled span for computing the token classification loss.
+            Positions are clamped to the length of the sequence (`sequence_length`).
+            Position outside of the sequence are not taken into account for computing the loss.
+
+    Returns:
+        :obj:`tuple(torch.FloatTensor)` comprising various elements depending on the configuration (:class:`~transformers.AlbertConfig`) and inputs:
+        loss: (`optional`, returned when ``labels`` is provided) ``torch.FloatTensor`` of shape ``(1,)``:
+            Total span extraction loss is the sum of a Cross-Entropy for the start and end positions.
+        start_scores ``torch.FloatTensor`` of shape ``(batch_size, sequence_length,)``
+            Span-start scores (before SoftMax).
+        end_scores: ``torch.FloatTensor`` of shape ``(batch_size, sequence_length,)``
+            Span-end scores (before SoftMax).
+        hidden_states (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_hidden_states=True``):
+            Tuple of :obj:`torch.FloatTensor` (one for the output of the embeddings + one for the output of each layer)
+            of shape :obj:`(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the initial embedding outputs.
+        attentions (:obj:`tuple(torch.FloatTensor)`, `optional`, returned when ``config.output_attentions=True``):
+            Tuple of :obj:`torch.FloatTensor` (one for each layer) of shape
+            :obj:`(batch_size, num_heads, sequence_length, sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+
+    Examples::
+
+        # The checkpoint albert-base-v2 is not fine-tuned for question answering. Please see the
+        # examples/run_squad.py example to see how to fine-tune a model to a question answering task.
+
+        from transformers import AlbertTokenizer, AlbertForQuestionAnswering
+        import torch
+
+        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
+        model = AlbertForQuestionAnswering.from_pretrained('albert-base-v2')
+        question, text = "Who was Jim Henson?", "Jim Henson was a nice puppet"
+        input_dict = tokenizer.encode_plus(question, text, return_tensors='pt')
+        start_scores, end_scores = model(**input_dict)
+
+        """
+
+        try:
+            outputs = self.albert(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                head_mask=head_mask,
+                inputs_embeds=inputs_embeds,
+                threshold=threshold
+            )
+
+            sequence_output = outputs[0]
+
+            logits = self.qa_outputs(sequence_output)
+            start_logits, end_logits = logits.split(1, dim=-1)
+            start_logits = start_logits.squeeze(-1)
+            end_logits = end_logits.squeeze(-1)
+
+            outputs = (start_logits, end_logits,) + outputs[2:]
+
+        except HighwayException as e:
+            outputs = e.message
+            exit_layer = e.exit_layer
+            start_logits = outputs[0]
+            end_logits = outputs[1]
+
+        if not self.training:
+            # original_start_entropy = entropy(start_logits)
+            # original_end_entropy = entropy(end_logits)
+            original_entropy = entropy(logits)
+            highway_entropy = []
+            # highway_start_logits_all = []
+            # highway_end_logits_all = []
+            highway_logits_all = []
+
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if len(start_positions.size()) > 1:
+                start_positions = start_positions.squeeze(-1)
+            if len(end_positions.size()) > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.size(1)
+            start_positions.clamp_(0, ignored_index)
+            end_positions.clamp_(0, ignored_index)
+
+            loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+            outputs = (total_loss,) + outputs
+
+            # work with highway exits
+            highway_losses = []
+            for highway_exit in outputs[-1]:
+                highway_logits = highway_exit[0]
+                highway_start_logits, highway_end_logits = logits.split(1, dim=-1)
+
+                if not self.training:
+                    highway_logits_all.append(highway_logits)
+                    highway_entropy.append(highway_exit[1])
+
+                loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+                start_loss = loss_fct(highway_start_logits, start_positions)
+                end_loss = loss_fct(highway_end_logits, end_positions)
+                highway_loss = (start_loss + end_loss) / 2
+                highway_losses.append(highway_loss)
+
+            if train_highway:
+                outputs = (sum(highway_losses[:-1]),) + outputs
+                # exclude the final highway, of course
+            else:
+                outputs = (loss,) + outputs
+
+        if not self.training:
+            outputs = outputs + ((original_entropy, highway_entropy), exit_layer)
+            if output_layer >= 0:
+                outputs = (outputs[0],) +\
+                          (highway_logits_all[output_layer],) +\
+                          outputs[2:]  ## use the highway of the last layer
+
+        return outputs  # (loss), start_logits, end_logits, (hidden_states), (attentions)
