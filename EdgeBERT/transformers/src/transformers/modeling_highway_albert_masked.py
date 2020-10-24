@@ -572,6 +572,7 @@ class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
         start_scores, end_scores = model(**input_dict)
 
         """
+        exit_layer = self.num_layers
 
         try:
             outputs = self.albert(

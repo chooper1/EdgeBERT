@@ -562,6 +562,8 @@ class AlbertForQuestionAnswering(AlbertPreTrainedModel):
 
         """
 
+        exit_layer = self.num_layers
+
         try:
             outputs = self.albert(
                 input_ids=input_ids,
