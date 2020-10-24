@@ -965,6 +965,12 @@ def main():
         help="Frequency at which we compute the TopK global threshold.",
     )
 
+    parser.add_argument(
+        "--one_class",
+        action='store_true',
+        help="Set this flag if you want only one highway classifier",
+    )
+
     # Distillation parameters (optional)
     parser.add_argument(
         "--teacher_type",
@@ -1160,6 +1166,7 @@ def main():
         pruning_method=args.pruning_method,
         mask_init=args.mask_init,
         mask_scale=args.mask_scale,
+        one_class=args.one_class,
     )
     tokenizer = tokenizer_class.from_pretrained(
         args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
@@ -1293,6 +1300,8 @@ def main():
             global_step = checkpoint.split("-")[-1] if len(checkpoints) > 1 else ""
             model = model_class.from_pretrained(checkpoint, params=params)  # , force_download=True)
             if args.model_type=="bert":
+                model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
+            elif args.model_type=="masked_bert":
                 model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
             elif args.model_type=="albert":
                 model.albert.encoder.set_early_exit_entropy(args.early_exit_entropy)
