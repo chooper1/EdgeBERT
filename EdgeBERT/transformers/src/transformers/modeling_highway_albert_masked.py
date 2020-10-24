@@ -623,7 +623,7 @@ class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
             start_loss = loss_fct(start_logits, start_positions)
             end_loss = loss_fct(end_logits, end_positions)
             total_loss = (start_loss + end_loss) / 2
-            outputs = (total_loss,) + outputs
+            # outputs = (total_loss,) + outputs
 
             # work with highway exits
             highway_losses = []
@@ -647,7 +647,7 @@ class MaskedAlbertForQuestionAnswering(MaskedAlbertPreTrainedModel):
                 outputs = (sum(highway_losses[:-1]),) + outputs
                 # exclude the final highway, of course
             else:
-                outputs = (loss,) + outputs
+                outputs = (total_loss,) + outputs
 
         if not self.training:
             outputs = outputs + ((original_entropy, highway_entropy), exit_layer)
