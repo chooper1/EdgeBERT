@@ -337,11 +337,16 @@ class AlbertAttention(BertSelfAttention):
             s_bar = s * (r - l) + l
             mask = s_bar.clamp(min=0.0, max=1.0)
         # Mask weights with computed mask
-        self.dense.weight = torch.nn.Parameter(mask * self.dense.weight)
+        weight_thresholded = torch.nn.Parameter(mask * self.dense.weight)
 
         # Should find a better way to do this
+        # w = (
+        #     self.dense.weight.t()
+        #     .view(self.num_attention_heads, self.attention_head_size, self.hidden_size)
+        #     .to(context_layer.dtype)
+        # )
         w = (
-            self.dense.weight.t()
+            weight_thresholded.t()
             .view(self.num_attention_heads, self.attention_head_size, self.hidden_size)
             .to(context_layer.dtype)
         )
