@@ -150,7 +150,7 @@ def regularization(model: nn.Module, mode: str):
     return regu / counter
 
 #def train(args, train_dataset, model, tokenizer, prune_schedule=None, train_highway=False):
-def train(args, train_dataset, model, tokenizer, teacher=None, train_highway=False):
+def train(args, train_dataset, model, tokenizer, teacher=None, prune_schedule=None, train_highway=False):
     """ Train the model """
     if args.local_rank in [-1, 0]:
         tb_writer = SummaryWriter()

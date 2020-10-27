@@ -34,6 +34,8 @@ from transformers.modeling_utils import PreTrainedModel, prune_linear_layer
 
 from .file_utils import add_start_docstrings, add_start_docstrings_to_callable
 
+from .binarizer import MagnitudeBinarizer, ThresholdBinarizer, TopKBinarizer
+
 
 logger = logging.getLogger(__name__)
 
@@ -315,6 +317,27 @@ class AlbertAttention(BertSelfAttention):
         context_layer = torch.matmul(attention_probs, value_layer)
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+
+        #apply pruning to self.dense
+
+        if self.dense.pruning_method == "topK":
+            mask = TopKBinarizer.apply(self.dense.mask_scores, threshold)
+        elif self.dense.pruning_method in ["threshold", "sigmoied_threshold"]:
+            sig = "sigmoied" in self.dense.pruning_method
+            mask = ThresholdBinarizer.apply(self.dense.mask_scores, threshold, sig)
+        elif self.dense.pruning_method == "magnitude":
+            mask = MagnitudeBinarizer.apply(self.dense.weight, threshold)
+        elif self.dense.pruning_method == "l0":
+            l, r, b = -0.1, 1.1, 2 / 3
+            if self.dense.training:
+                u = torch.zeros_like(self.dense.mask_scores).uniform_().clamp(0.0001, 0.9999)
+                s = torch.sigmoid((u.log() - (1 - u).log() + self.dense.mask_scores) / b)
+            else:
+                s = torch.sigmoid(self.dense.mask_scores)
+            s_bar = s * (r - l) + l
+            mask = s_bar.clamp(min=0.0, max=1.0)
+        # Mask weights with computed mask
+        self.dense.weight = mask * self.dense.weight
 
         # Should find a better way to do this
         w = (
