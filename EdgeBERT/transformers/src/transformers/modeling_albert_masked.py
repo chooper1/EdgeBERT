@@ -337,7 +337,7 @@ class AlbertAttention(BertSelfAttention):
             s_bar = s * (r - l) + l
             mask = s_bar.clamp(min=0.0, max=1.0)
         # Mask weights with computed mask
-        self.dense.weight = mask * self.dense.weight
+        self.dense.weight = torch.nn.Parameter(mask * self.dense.weight)
 
         # Should find a better way to do this
         w = (
