@@ -5,7 +5,7 @@ This repository contains the software code used to train and evaluate models in 
 **EdgeBERT: Sentence-Level Energy Optimizations for Latency-Aware Multi-Task NLP Inference** (https://arxiv.org/abs/2011.14203). 
 
 # Installation Instructions:
-See Install.md for detailed installation instructions.
+See INSTALL.md for detailed installation instructions.
 
 # References:
 
