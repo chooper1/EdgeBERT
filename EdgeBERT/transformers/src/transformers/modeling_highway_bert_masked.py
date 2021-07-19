@@ -58,7 +58,8 @@ class BertEmbeddings(nn.Module):
 
 class BertEncoder(nn.Module):
     def __init__(self, config, params):
-        super(BertEncoder, self).__init__(config, params)
+        #super(BertEncoder, self).__init__(config, params)
+        super().__init__()
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.layer = nn.ModuleList([BertLayer(config, params) for _ in range(config.num_hidden_layers)])
@@ -386,7 +387,7 @@ class MaskedBertForSequenceClassification(MaskedBertPreTrainedModel):
         self.num_labels = config.num_labels
         self.num_layers = config.num_hidden_layers
 
-        self.bert = MaskedBertModel(config)
+        self.bert = MaskedBertModel(config, params)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.classifier = nn.Linear(config.hidden_size, self.config.num_labels)
 

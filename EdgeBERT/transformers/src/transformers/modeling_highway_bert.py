@@ -54,7 +54,8 @@ class BertEmbeddings(nn.Module):
 
 class BertEncoder(nn.Module):
     def __init__(self, config, params):
-        super(BertEncoder, self).__init__(config, params)
+        #super(BertEncoder, self).__init__(config, params)
+        super().__init__()
         self.output_attentions = config.output_attentions
         self.output_hidden_states = config.output_hidden_states
         self.layer = nn.ModuleList([BertLayer(config, params) for _ in range(config.num_hidden_layers)])

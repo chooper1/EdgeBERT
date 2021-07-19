@@ -21,12 +21,12 @@ fi
 SQUAD_DATA=./squad/
 DATASET=squad
 
-THRESHOLDS="1 0.8 0.6"
+THRESHOLDS="1"
 
 for FINAL_THRESH in $THRESHOLDS; do
   echo $FINAL_THRESH
-  python ../examples/masked_run_highway_squad.py \
-    --model_type $MODEL_TYPE \
+  python ../examples/masked_run_squad.py \
+    --model_type albert \
     --model_name_or_path $MODEL_NAME \
     --train_file train-v2.0.json \
     --predict_file dev-v2.0.json \
@@ -41,15 +41,8 @@ for FINAL_THRESH in $THRESHOLDS; do
     --num_train_epochs $EPOCHS \
     --overwrite_output_dir \
     --seed 42 \
-    --output_dir ./saved_models/${MODEL_TYPE}-${MODEL_SIZE}/$DATASET/two_stage_pruned_${FINAL_THRESH}_distil \
+    --output_dir ./saved_models/${MODEL_TYPE}-${MODEL_SIZE}/$DATASET/teacher \
     --save_steps 0 \
     --overwrite_cache \
-    --warmup_steps 5400 \
-    --mask_scores_learning_rate 1e-2 \
-    --initial_threshold 1 --final_threshold ${FINAL_THRESH} \
-    --initial_warmup 1 --final_warmup 2 \
-    --pruning_method topK --mask_init constant --mask_scale 0. \
-    --version_2_with_negative \
-    --teacher_type albert_teacher --teacher_name_or_path /n/holyscratch01/acc_lab/chooper/albert-py/DeeBERT-albert/scripts/saved_models/albert-base/$DATASET/teacher \
-    --alpha_ce 0.5 --alpha_distil 0.5
+    --version_2_with_negative 
 done

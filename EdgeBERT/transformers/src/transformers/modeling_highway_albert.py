@@ -6,6 +6,8 @@ from .modeling_albert import AlbertPreTrainedModel, AlbertLayerNorm, AlbertLayer
 from .modeling_bert import BertEmbeddings
 from .modeling_highway_bert import BertPooler
 
+import numpy as np
+
 def entropy(x):
     # x: torch.Tensor, logits BEFORE softmax
     exp_x = torch.exp(x)
@@ -66,6 +68,15 @@ class AlbertTransformer(nn.Module):
         self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size, config.hidden_size)
         self.albert_layer_groups = nn.ModuleList([AlbertLayerGroup(config, params) for _ in range(config.num_hidden_groups)])
 
+        self.entropy_predictor = config.entropy_predictor
+        if config.entropy_predictor:
+            self.lookup_table = np.loadtxt(config.lookup_table_file, delimiter=",")
+            self.predict_layer = config.predict_layer
+            self.predict_average_layers = config.predict_average_layers
+            self.extra_layer=config.extra_layer
+            self.get_predict_acc=config.get_predict_acc
+            self.no_ee_before=config.no_ee_before
+
         #self.layer = nn.ModuleList([AlbertLayer(config) for _ in range(config.num_hidden_layers)])
         ### try grouping for efficiency
         if config.one_class:
@@ -116,10 +127,6 @@ class AlbertTransformer(nn.Module):
             if self.output_attentions:
                 all_attentions = all_attentions + layer_group_output[-1]
 
-            ###check
-            #if self.output_hidden_states:
-            #    all_hidden_states = all_hidden_states + (hidden_states,)
-
             #added this section
             current_outputs = (hidden_states,)
             if self.output_hidden_states:
@@ -127,14 +134,10 @@ class AlbertTransformer(nn.Module):
             if self.output_attentions:
                 current_outputs = current_outputs + (all_attentions,)
 
-            #problem:: returns 8*128=1024 instead of 8 cells
-            #highway_exit = self.highway[group_idx](current_outputs) #changed from self.highway[i](current_outputs)
-
             if self.config.one_class:
                 highway_exit = self.highway[group_idx](current_outputs)
             else:
                 highway_exit = self.highway[i](current_outputs)
-            #highway_exit = self.highway[group_idx](current_outputs)
 
             #added this section
             if not self.training:
@@ -148,16 +151,106 @@ class AlbertTransformer(nn.Module):
                 else:
                     ent_ = self.early_exit_entropy[i]
 
-                if highway_entropy < ent_:
-                # if highway_entropy < self.early_exit_entropy[group_idx]:
-                    # weight_func = lambda x: torch.exp(-3 * x) - 0.5**3
-                    # weight_func = lambda x: 2 - torch.exp(x)
-                    # weighted_logits = \
-                    #     sum([weight_func(x[2]) * x[0] for x in all_highway_exits]) /\
-                    #     sum([weight_func(x[2]) for x in all_highway_exits])
-                    # new_output = (weighted_logits,) + current_outputs[1:] + (all_highway_exits,)
-                    new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
-                    raise HighwayException(new_output, i+1)
+                if not self.entropy_predictor:
+                    if highway_entropy < ent_:
+                        new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                        raise HighwayException(new_output, i+1)
+
+                elif (self.get_predict_acc):
+                    if i==0:
+                        count = 0
+                        check_ee = 0
+                    if self.predict_layer-1 == i:
+                        if self.predict_average_layers:
+                            if i == 0:
+                                hw_ent_temp = highway_entropy.cpu().numpy()[0]
+                            else:
+                                hw_ent_temp = hw_ent_temp + highway_entropy.cpu().numpy()[0]
+                            hw_ent = hw_ent_temp / float((i+1))
+                        else:
+                            hw_ent = highway_entropy.cpu().numpy()[0]
+                        #hash into lookup table w/ highway_entropy
+                        idx = (np.abs(self.lookup_table[:,0] - hw_ent)).argmin()
+                        entropy_layers = np.transpose(self.lookup_table[idx,1:])
+                        below_thresh = entropy_layers < ent_
+                        k = np.argmax(below_thresh) # k is number of remaining layers
+                        if (np.sum(below_thresh) == 0): #never hit threshold
+                            k = entropy_layers.shape[0] - 1
+                        k = k + self.predict_layer
+                        count = count + 1
+                        #print(idx)
+                        #print(self.lookup_table[idx,:])
+                        #print(k)
+
+                    if ((highway_entropy < ent_) or (i == self.config.num_hidden_layers-1)) and not check_ee:
+                        j = i # j is hw exit layer
+                        count = count + 1
+                        check_ee = 1
+
+                    if count == 2:
+                        new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                        #return abs value of diff between j and k
+                        if j>k:
+                          raise HighwayException(new_output, (j-k) + 1)
+                        else:
+                          raise HighwayException(new_output, (k-j) + 1)
+
+                else:
+                    if (i < self.predict_layer - 1): # before predict layer
+                        #exit here????
+                        if highway_entropy < ent_:
+                            new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                            raise HighwayException(new_output, i+1)
+
+                        if self.predict_average_layers: # predict layer
+                            if i == 0:
+                                hw_ent_temp = highway_entropy.cpu().numpy()[0]
+                            else:
+                                hw_ent_temp = hw_ent_temp + highway_entropy.cpu().numpy()[0]
+
+                    if (i == self.predict_layer - 1): # predict layer
+
+                        if highway_entropy < ent_:
+                            new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                            raise HighwayException(new_output, i+1)
+
+                        if self.predict_average_layers:
+                            if i == 0:
+                                hw_ent_temp = highway_entropy.cpu().numpy()[0]
+                            else:
+                                hw_ent_temp = hw_ent_temp + highway_entropy.cpu().numpy()[0]
+                            hw_ent = hw_ent_temp / float((i+1))
+                        else:
+                            hw_ent = highway_entropy.cpu().numpy()[0]
+
+                        #hash into lookup table w/ highway_entropy
+                        idx = (np.abs(self.lookup_table[:,0] - hw_ent)).argmin()
+                        entropy_layers = np.transpose(self.lookup_table[idx,1:])
+                        below_thresh = entropy_layers < ent_
+                        k = np.argmax(below_thresh) # k is number of remaining layers
+                        if (np.sum(below_thresh) == 0): #never hit threshold
+                            k = entropy_layers.shape[0] - 1
+
+                    # other layers (count down and then trigger highway exit if layer < self.num_hidden_layers)
+                    elif ((i >= self.predict_layer) and (i < self.config.num_hidden_layers - 2)):
+
+                        if (self.extra_layer):
+                            if k == 0:
+                                if highway_entropy < ent_:
+                                    new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                                    raise HighwayException(new_output, i+1)
+                            elif k==-1:
+                                new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                                raise HighwayException(new_output, i+1)
+                        else:
+                            if (not self.no_ee_before):
+                                if highway_entropy < ent_:
+                                    new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                                    raise HighwayException(new_output, i+1)
+                            if k == 0: #exit after counting down layers (CHECK CORRECT # OF LAYERS)
+                                new_output = (highway_logits,) + current_outputs[1:] + (all_highway_exits,)
+                                raise HighwayException(new_output, i+1)
+                        k = k - 1
             else:
                 all_highway_exits = all_highway_exits + (highway_exit,)
 

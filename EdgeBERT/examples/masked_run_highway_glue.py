@@ -534,7 +534,10 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
             for i in range(model.num_layers):
                 running_avg += exit_layer_counter[i+1] * (i+1)
             avg_exit_layer = running_avg / num_ex
-            print("Average Exit Layer", avg_exit_layer)
+            if (args.get_predict_acc): #getting diff between EE and predict
+                print("Average Layer Diff", avg_exit_layer-1)
+            else:
+                print("Average Exit Layer", avg_exit_layer)
             actual_cost = sum([l*c for l, c in exit_layer_counter.items()])
             full_cost = len(eval_dataloader) * model.num_layers
             print("Expected saving", actual_cost/full_cost)
@@ -545,6 +548,7 @@ def evaluate(args, model, tokenizer, prefix="", output_layer=-1, eval_highway=Fa
                 if not os.path.exists(os.path.dirname(save_fname)):
                     os.makedirs(os.path.dirname(save_fname))
                 print_result = get_wanted_result(result)
+                print(print_result)
                 np.save(save_fname,
                         np.array([exit_layer_counter,
                                   eval_time,
@@ -656,8 +660,35 @@ def main():
     parser.add_argument(
         "--one_class",
         action='store_true',
-        help="Set this flag if you want only one highway classifier",
+        help="Set this flag to use only one highway classifier",
     )
+    parser.add_argument(
+        "--entropy_predictor",
+        action='store_true',
+        help="Set this flag to do entropy prediction",
+    )
+    parser.add_argument("--predict_layer", default=1, type=int,
+                        help="Layer to perform entropy prediction")
+    parser.add_argument("--predict_average_layers", default=0, type=int,
+                        help="Whether to average entropy values when doing entropy prediction.")
+    parser.add_argument('--lookup_table_file', type=str, default='./sst2_lookup_table.csv',
+                        help="Path to lookup table")
+    parser.add_argument(
+        "--extra_layer",
+        action='store_true',
+        help="Set this flag to allow for an extra layer after the predicted layer",
+    )
+    parser.add_argument(
+        "--get_predict_acc",
+        action='store_true',
+        help="Set this flag to compare prediction acc w/ EE acc",
+    )
+    parser.add_argument(
+        "--no_ee_before",
+        action='store_true',
+        help="Set this flag to not perform ee before the predicted layer",
+    )
+
 
     parser.add_argument("--per_gpu_train_batch_size", default=8, type=int,
                         help="Batch size per GPU/CPU for training.")
@@ -894,7 +925,15 @@ def main():
         mask_init=args.mask_init,
         mask_scale=args.mask_scale,
         one_class=args.one_class,
+        entropy_predictor=args.entropy_predictor,
+        predict_layer=args.predict_layer,
+        predict_average_layers=args.predict_average_layers,
+        lookup_table_file=args.lookup_table_file,
+        extra_layer=args.extra_layer,
+        get_predict_acc=args.get_predict_acc,
+        no_ee_before=args.no_ee_before
     )
+
     tokenizer = tokenizer_class.from_pretrained(
         args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
         cache_dir=args.cache_dir if args.cache_dir else None,
@@ -955,7 +994,6 @@ def main():
 
     logger.info("Training/evaluation parameters %s", args)
 
-
     # Training
     if args.do_train:
         train_dataset = load_and_cache_examples(args, args.task_name, tokenizer, evaluate=False)
@@ -1013,7 +1051,7 @@ def main():
             global_step = checkpoint.split('-')[-1] if len(checkpoints) > 1 else ""
             prefix = checkpoint.split('/')[-1] if checkpoint.find('checkpoint') != -1 else ""
 
-            model = model_class.from_pretrained(checkpoint, params=params)
+            model = model_class.from_pretrained(checkpoint, params=params, config=config)
             if args.model_type=="bert":
                 model.bert.encoder.set_early_exit_entropy(args.early_exit_entropy)
             elif args.model_type=="masked_bert":

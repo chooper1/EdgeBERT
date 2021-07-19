@@ -8,7 +8,7 @@ MODEL_SIZE=base  # base or large
 DATASET=QQP  # SST-2, MRPC, RTE, QNLI, QQP, or MNLI
 
 MODEL_NAME=${MODEL_TYPE}-${MODEL_SIZE}
-EPOCHS=10
+EPOCHS=3
 if [ $MODEL_TYPE = 'bert' ]
 then
   EPOCHS=3
@@ -17,7 +17,7 @@ fi
 
 if [ $MODEL_TYPE = 'albert' ]
 then
-  EPOCHS=10
+  EPOCHS=3
   MODEL_NAME=${MODEL_NAME}-v2
 fi
 
@@ -32,8 +32,9 @@ python ../examples/run_glue.py \
   --data_dir $PATH_TO_DATA/$DATASET \
   --max_seq_length 128 \
   --per_gpu_eval_batch_size 1 \
-  --per_gpu_train_batch_size 8 \
-  --learning_rate 2e-5 \
+  --per_gpu_train_batch_size 32 \
+  --learning_rate 3e-5 \
+  --warmup_steps 11300 \
   --num_train_epochs $EPOCHS \
   --save_steps 0 \
   --seed 42 \

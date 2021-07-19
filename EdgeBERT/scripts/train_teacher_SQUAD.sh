@@ -40,5 +40,4 @@ python ../examples/masked_run_highway_squad.py \
   --seed 42 \
   --output_dir ./saved_models/${MODEL_TYPE}-${MODEL_SIZE}/$DATASET/teacher \
   --overwrite_cache \
-  --overwrite_output_dir \
-  --version_2_with_negative 
+  --overwrite_output_dir  

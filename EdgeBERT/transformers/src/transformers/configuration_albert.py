@@ -125,6 +125,13 @@ class AlbertConfig(PretrainedConfig):
         layer_norm_eps=1e-12,
         classifier_dropout_prob=0.1,
         one_class=False,
+        entropy_predictor=False,
+        lookup_table_file="./sst2_lookup_table.csv",
+        predict_layer = 1,
+        predict_average_layers=0,
+        extra_layer=0,
+        get_predict_acc=False,
+        no_ee_before=False,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -146,3 +153,10 @@ class AlbertConfig(PretrainedConfig):
         self.layer_norm_eps = layer_norm_eps
         self.classifier_dropout_prob = classifier_dropout_prob
         self.one_class = one_class
+        self.entropy_predictor = entropy_predictor
+        self.lookup_table_file = lookup_table_file
+        self.predict_layer = predict_layer
+        self.predict_average_layers = predict_average_layers
+        self.extra_layer = extra_layer
+        self.get_predict_acc = get_predict_acc
+        self.no_ee_before = no_ee_before
