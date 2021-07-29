@@ -7,7 +7,8 @@ System requirements (assuming a unix system)
 
 Run the following commands:
 
-`conda create --name test-edge python=3.7
+```
+conda create --name test-edge python=3.7
 
 source activate test-edge
 
@@ -20,4 +21,4 @@ pip install -U scikit-learn
 cd EdgeBERT/transformers
 
 python setup.py install
-`
+```
