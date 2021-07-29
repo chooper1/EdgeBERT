@@ -14,6 +14,8 @@ To produce a lookup table for entropy prediction:
 
 2. Run all cells in this notebook and download the resulting csv file.
 
-# Training and evaluating models (example is with SST-2)
-
+# Training and evaluating models
 Change into the EdgeBERT/scripts directory and follow the steps in the README.md file.
+
+# Alternative: Jupyter notebook for training and evaluating models
+The edgebert.ipynb notebook allows for training and evaluating models in Google Colab. Note that training times are such that training cannot be run using a hosted runtime.
