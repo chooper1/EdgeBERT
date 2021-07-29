@@ -10,7 +10,7 @@ See INSTALL.md for detailed installation instructions.
 # Producing a lookup table for entropy prediction
 To produce a lookup table for entropy prediction:
 
-1. Open entropypredictor.ipynb in Google Colab and load the desired training and test entropy datasets.
+1. Open Entropy_LUT/entropypredictor.ipynb in Google Colab and load the desired training and test entropy datasets.
 
 2. Run all cells in this notebook and download the resulting csv file.
 
